@@ -3,20 +3,20 @@ cmake_minimum_required (VERSION 3.5)
 set(CMAKE_CXX_STANDARD 17)
 
 # set project's name
-set (PROJECT easypaint)
+set (PROJECT luster-ko)
 
 message(STATUS "System: " ${CMAKE_HOST_SYSTEM_NAME} " " ${CMAKE_HOST_SYSTEM_VERSION})
 message(STATUS "Processor: " ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
 # add version define
-set(EASYPAINT_VERSION 0.1.3)
+set(APP_VERSION 0.1.3)
 
-add_compile_definitions(EASYPAINT_VERSION="${EASYPAINT_VERSION}")
+add_compile_definitions(APP_VERSION="${APP_VERSION}")
 
 #------- headers --------
 set (HEADERS
     sources/mainwindow.h
-    sources/easypaintenums.h
+    sources/app_enums.h
     sources/imagearea.h
     sources/datasingleton.h
     sources/autorun_utils.h
@@ -130,10 +130,10 @@ set (RESOURCES
 #------- languages -------
 if(NOT NO_TRANSLATIONS)
     set (TRANSLATIONS
-        sources/translations/easypaint_ru_RU.ts
-        sources/translations/easypaint_cs_CZ.ts
-        sources/translations/easypaint_zh_CN.ts
-        sources/translations/easypaint_fr_FR.ts)
+        sources/translations/translations_ru_RU.ts
+        sources/translations/translations_cs_CZ.ts
+        sources/translations/translations_zh_CN.ts
+        sources/translations/translations_fr_FR.ts)
 endif(NOT NO_TRANSLATIONS)
 
 project (${PROJECT})
@@ -196,10 +196,10 @@ target_link_libraries(${PROJECT}
 
 # --- Installation (Linux) ---
 if(UNIX AND NOT APPLE)
-    install(TARGETS easypaint RUNTIME DESTINATION bin)
-    install(FILES "sources/media/easypaint.desktop" DESTINATION share/applications)
+    install(TARGETS luster-ko RUNTIME DESTINATION bin)
+    install(FILES "sources/media/luster-ko.desktop" DESTINATION share/applications)
     install(FILES "sources/media/logo/easypaint_64.png" DESTINATION share/pixmaps)
-    install(FILES ${TRANSLATIONS_QM} DESTINATION share/easypaint/translations)
+    install(FILES ${TRANSLATIONS_QM} DESTINATION share/luster-ko/translations)
 endif()
 
 # --- Installation (Windows / MSVC) ---

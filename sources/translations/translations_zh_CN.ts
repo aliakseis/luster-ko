@@ -314,8 +314,8 @@
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="413"/>
-        <source>&amp;About EasyPaint</source>
-        <translation>(&amp;A)关于 EasyPaint</translation>
+        <source>&amp;About lusterr-ko</source>
+        <translation>(&amp;A)关于 lusterr-ko</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="420"/>
@@ -348,8 +348,8 @@ Do you want to save changes?</source>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="849"/>
-        <source>About EasyPaint</source>
-        <translation>关于EasyPaint</translation>
+        <source>About lusterr-ko</source>
+        <translation>关于lusterr-ko</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="860"/>
@@ -368,8 +368,8 @@ Do you want to save changes?</source>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="861"/>
-        <source>If you like &lt;b&gt;EasyPaint&lt;/b&gt; and you want to share your opinion, or send a bug report, or want to suggest new features, we are waiting for you on our &lt;a href=&quot;https://github.com/Gr1N/EasyPaint/issues?milestone=&amp;sort=created&amp;direction=desc&amp;state=open&quot;&gt;tracker&lt;/a&gt;.</source>
-        <translation>如果你喜欢&lt;b&gt;EasyPaint&lt;/b&gt;而且想向我们提意见或者报告bug，甚至想添加任何新功能，都可以在&lt;a &quot;https://github.com/Gr1N/EasyPaint/issues?milestone=&amp;sort=created&amp;direction=desc&amp;state=open&quot;&gt;这里&lt;/a&gt;向我们进行反馈.</translation>
+        <source>If you like &lt;b&gt;lusterr-ko&lt;/b&gt; and you want to share your opinion, or send a bug report, or want to suggest new features, we are waiting for you on our &lt;a href=&quot;https://github.com/aliakseis/lusterr-ko/issues?milestone=&amp;sort=created&amp;direction=desc&amp;state=open&quot;&gt;tracker&lt;/a&gt;.</source>
+        <translation>如果你喜欢&lt;b&gt;lusterr-ko&lt;/b&gt;而且想向我们提意见或者报告bug，甚至想添加任何新功能，都可以在&lt;a &quot;https://github.com/aliakseis/lusterr-ko/issues?milestone=&amp;sort=created&amp;direction=desc&amp;state=open&quot;&gt;这里&lt;/a&gt;向我们进行反馈.</translation>
     </message>
 </context>
 <context>

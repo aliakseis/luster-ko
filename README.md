@@ -1,18 +1,14 @@
-EasyPaint
+luster-ko
 =========
 
-EasyPaint is a simple graphics painting program.
-
-EasyPaint is a part of QtDesktop project.
-
-EasyPaint is a part of [Razor-qt's](https://github.com/Razor-qt) [3rd party applications](https://github.com/Razor-qt/razor-qt/wiki/3rd-party-applications).
+luster-ko is a simple graphics editing program.
 
 Installing
 ----------
 
-Install EasyPaint using the commands, if you use CMake:
+Install luster-ko using the commands, if you use CMake:
 
-    cd ./EasyPaint
+    cd ./luster-ko
     cmake -DCMAKE_INSTALL_PREFIX=/usr
     make
     make install
@@ -20,7 +16,7 @@ Install EasyPaint using the commands, if you use CMake:
 License
 -------
 
-EasyPaint is distributed under the [MIT license](http://www.opensource.org/licenses/MIT).
+luster-ko is distributed under the [MIT license](http://www.opensource.org/licenses/MIT).
 
 Python scripting
 ----------------
@@ -311,7 +307,6 @@ Enable Instruments -> Markup mode to use markup:
 
 <img width="522" height="472" alt="Image" src="https://github.com/user-attachments/assets/1c988672-5008-48d5-afaf-e952605495f3" />
 
-![image](EasyPaint_demo2.jpg)
+![image](luster-ko_demo2.jpg)
 
-![image](EasyPaint_demo.jpg)
-See also https://github.com/aliakseis/EasyPaint/issues/4
+![image](luster-ko_demo.jpg)

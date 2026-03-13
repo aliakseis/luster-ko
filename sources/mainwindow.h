@@ -1,7 +1,7 @@
 /*
- * This source file is part of EasyPaint.
+ * This source file is part of luster-ko.
  *
- * Copyright (c) 2012 EasyPaint <https://github.com/Gr1N/EasyPaint>
+ * Copyright (c) 2026 luster-ko <https://github.com/aliakseis/luster-ko>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,7 +29,7 @@
 #include <QMainWindow>
 #include <QtCore/QMap>
 
-#include "easypaintenums.h"
+#include "app_enums.h"
 
 QT_BEGIN_NAMESPACE
 class QAction;
@@ -110,7 +110,7 @@ private:
             *mNewAction, *mOpenAction, *mExitAction, *mPasteAction, *mZoomInAction, *mZoomOutAction;
     QMenu *mFileMenu, *mInstrumentsMenu, *mEffectsMenu, *mToolsMenu;
     QUndoGroup *mUndoStackGroup;
-    bool mPrevInstrumentSetted; /**< Used for magnifier */
+    bool mPrevInstrumentSet; /**< Used for magnifier */
 
     enum { MaxRecentFiles = 20 };
     QAction* recentFileActs[MaxRecentFiles];

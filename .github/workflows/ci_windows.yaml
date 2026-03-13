@@ -92,7 +92,7 @@ jobs:
           archives: qtbase qtquickcontrols2 qtdeclarative qttools d3dcompiler_47
           cache: true
 
-      - name: Build EasyPaint
+      - name: Build luster-ko
         run: |
           cmake `
             -B build `

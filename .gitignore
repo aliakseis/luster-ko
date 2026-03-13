@@ -37,3 +37,4 @@ CMakeLists.txt.user*
 out/
 build/
 CMakeSettings.json
+CMake*Presets.json

@@ -1,7 +1,7 @@
 /*
- * This source file is part of EasyPaint.
+ * This source file is part of luster-ko.
  *
- * Copyright (c) 2012 EasyPaint <https://github.com/Gr1N/EasyPaint>
+ * Copyright (c) 2026 luster-ko <https://github.com/aliakseis/luster-ko>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,14 +23,13 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef EASYPAINTENUMS_H
-#define EASYPAINTENUMS_H
+#pragma once
 
 /**
  * @brief Enum with instruments names
  *
  */
-typedef enum
+enum InstrumentsEnum
 {
     NONE_INSTRUMENT = 0,
     CURSOR,
@@ -48,13 +47,13 @@ typedef enum
 
     // Don't use it. (Used to know count of current instrument)
     INSTRUMENTS_COUNT
-} InstrumentsEnum;
+};
 
 /**
  * @brief Enum with effects names
  *
  */
-typedef enum
+enum EffectsEnum
 {
     NONE_EFFECT = 0,
     NEGATIVE,
@@ -67,6 +66,4 @@ typedef enum
 
     // Don't use it. (Used to know count of current instrument)
     EFFECTS_COUNT
-} EffectsEnum;
-
-#endif // EASYPAINTENUMS_H
+};

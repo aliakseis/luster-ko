@@ -1,7 +1,7 @@
 /*
- * This source file is part of EasyPaint.
+ * This source file is part of luster-ko.
  *
- * Copyright (c) 2012 EasyPaint <https://github.com/Gr1N/EasyPaint>
+ * Copyright (c) 2026 luster-ko <https://github.com/aliakseis/luster-ko>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -60,7 +60,7 @@ static QString strippedName(const QString& fullFileName)
 }
 
 MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
-    : QMainWindow(parent), mPrevInstrumentSetted(false)
+    : QMainWindow(parent), mPrevInstrumentSet(false)
 {
     QSize winSize = DataSingleton::Instance()->getWindowSize();
     if (DataSingleton::Instance()->getIsRestoreWindowSize() &&  winSize.isValid()) {
@@ -162,7 +162,7 @@ ImageArea* MainWindow::initializeNewTab(bool openFile, bool askCanvasSize, const
     connect(imageArea, SIGNAL(sendEnableCopyCutActions(bool)), this, SLOT(enableCopyCutActions(bool)));
     connect(imageArea, SIGNAL(sendEnableSelectionInstrument(bool)), this, SLOT(instumentsAct(bool)));
 
-    setWindowTitle(QString("%1 - EasyPaint").arg(fileName));
+    setWindowTitle(QString("%1 - luster-ko").arg(fileName));
     setCurrentFile(imageArea->getFilePath());
     
     return imageArea;
@@ -384,7 +384,7 @@ void MainWindow::initializeMainMenu()
 
     QMenu *aboutMenu = menuBar()->addMenu(tr("&About"));
 
-    QAction *aboutAction = new QAction(tr("&About EasyPaint"), this);
+    QAction *aboutAction = new QAction(tr("&About luster-ko"), this);
     aboutAction->setShortcut(QKeySequence::HelpContents);
     aboutAction->setIcon(QIcon::fromTheme("help-about", QIcon(":/media/actions-icons/help-about.png")));
     aboutAction->setIconVisibleInMenu(true);
@@ -460,11 +460,11 @@ void MainWindow::activateTab(const int &index)
 
     if(!getCurrentImageArea()->getFileName().isEmpty())
     {
-        setWindowTitle(QString("%1 - EasyPaint").arg(getCurrentImageArea()->getFileName()));
+        setWindowTitle(QString("%1 - luster-ko").arg(getCurrentImageArea()->getFileName()));
     }
     else
     {
-        setWindowTitle(QString("%1 - EasyPaint").arg(tr("Untitled Image")));
+        setWindowTitle(QString("%1 - luster-ko").arg(tr("Untitled Image")));
     }
     mUndoStackGroup->setActiveStack(getCurrentImageArea()->getUndoStack());
 }
@@ -676,7 +676,7 @@ void MainWindow::closeTab(int index)
     delete wid;
     if (mTabWidget->count() == 0)
     {
-        setWindowTitle("Empty - EasyPaint");
+        setWindowTitle("Empty - luster-ko");
     }
 }
 
@@ -754,10 +754,10 @@ void MainWindow::instumentsAct(bool state)
     QAction *currentAction = static_cast<QAction*>(sender());
     if(state)
     {
-        if(currentAction == mInstrumentsActMap[COLORPICKER] && !mPrevInstrumentSetted)
+        if(currentAction == mInstrumentsActMap[COLORPICKER] && !mPrevInstrumentSet)
         {
             DataSingleton::Instance()->setPreviousInstrument(DataSingleton::Instance()->getInstrument());
-            mPrevInstrumentSetted = true;
+            mPrevInstrumentSet = true;
         }
         setAllInstrumentsUnchecked(currentAction);
         currentAction->setChecked(true);
@@ -823,7 +823,7 @@ void MainWindow::restorePreviousInstrument()
     setInstrumentChecked(DataSingleton::Instance()->getPreviousInstrument());
     DataSingleton::Instance()->setInstrument(DataSingleton::Instance()->getPreviousInstrument());
     emit sendInstrumentChecked(DataSingleton::Instance()->getPreviousInstrument());
-    mPrevInstrumentSetted = false;
+    mPrevInstrumentSet = false;
 }
 
 void MainWindow::setInstrument(InstrumentsEnum instrument)
@@ -831,15 +831,15 @@ void MainWindow::setInstrument(InstrumentsEnum instrument)
     setInstrumentChecked(instrument);
     DataSingleton::Instance()->setInstrument(instrument);
     emit sendInstrumentChecked(instrument);
-    mPrevInstrumentSetted = false;
+    mPrevInstrumentSet = false;
 }
 
 void MainWindow::helpAct()
 {
-    QMessageBox::about(this, tr("About EasyPaint"),
-                       QString("<b>EasyPaint</b> %1: %2 <br> <br> %3: "
-                               "<a href=\"https://github.com/aliakseis/EasyPaint/\">https://github.com/aliakseis/EasyPaint/</a>"
-                               "<br> <br>Copyright (c) EasyPaint team"
+    QMessageBox::about(this, tr("About luster-ko"),
+                       QString("<b>luster-ko</b> %1: %2 <br> <br> %3: "
+                               "<a href=\"https://github.com/aliakseis/luster-ko/\">https://github.com/aliakseis/luster-ko/</a>"
+                               "<br> <br>Copyright (c) luster-ko team"
                                "<br> <br>%4:<ul>"
                                "<li><a href=\"mailto:grin.minsk@gmail.com\">Nikita Grishko</a> (Gr1N)</li>"
                                "<li><a href=\"mailto:faulknercs@yandex.ru\">Artem Stepanyuk</a> (faulknercs)</li>"
@@ -851,7 +851,6 @@ void MainWindow::helpAct()
                                "<br>Python version " PY_VERSION)
                                //"<br> %5")
                        .arg(tr("version"), QApplication::applicationVersion(), tr("Site"), tr("Authors")));
-                       //.arg(tr("If you like <b>EasyPaint</b> and you want to share your opinion, or send a bug report, or want to suggest new features, we are waiting for you on our <a href=\"https://github.com/Gr1N/EasyPaint/issues?milestone=&sort=created&direction=desc&state=open\">tracker</a>.")));
 }
 
 const auto recentFileList = QStringLiteral("recentFileList");

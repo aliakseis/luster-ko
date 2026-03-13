@@ -1,7 +1,7 @@
 /*
- * This source file is part of EasyPaint.
+ * This source file is part of luster-ko.
  *
- * Copyright (c) 2012 EasyPaint <https://github.com/Gr1N/EasyPaint>
+ * Copyright (c) 2026 luster-ko <https://github.com/aliakseis/luster-ko>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -26,7 +26,7 @@
 #ifndef TOOLBAR_H
 #define TOOLBAR_H
 
-#include "../easypaintenums.h"
+#include "../app_enums.h"
 
 #include <QToolBar>
 
@@ -65,7 +65,7 @@ private:
                 *mColorPickerButton, *mMagnifierButton, *mSprayButton, *mFillButton,
                 *mRectangleButton, *mEllipseButton, *mCurveButton, *mTextButton;
     ColorChooser *mPColorChooser, *mSColorChooser;
-    bool mPrevInstrumentSetted;
+    bool mPrevInstrumentSet;
     const QMap<InstrumentsEnum, QAction*> &mActMap;
     
 signals:

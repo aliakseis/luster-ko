@@ -1,7 +1,7 @@
 /*
- * This source file is part of EasyPaint.
+ * This source file is part of luster-ko.
  *
- * Copyright (c) 2012 EasyPaint <https://github.com/Gr1N/EasyPaint>
+ * Copyright (c) 2026 luster-ko <https://github.com/aliakseis/luster-ko>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -341,7 +341,7 @@ void SettingsDialog::initializeGui() {
 int SettingsDialog::getLanguageIndex()
 {
     QStringList languages;
-    languages<<"system"<<"easypaint_en_EN"<<"easypaint_cs_CZ"<<"easypaint_fr_FR"<<"easypaint_ru_RU";
+    languages<<"system"<<"translations_en_EN"<<"translations_cs_CZ"<<"translations_fr_FR"<<"translations_ru_RU";
     return languages.indexOf(DataSingleton::Instance()->getAppLanguage());
 }
 
@@ -359,7 +359,7 @@ void SettingsDialog::sendSettingsToSingleton()
     DataSingleton::Instance()->setVirtualEnvPath(mVenvPathInput->text());
 
     QStringList languages;
-    languages << "system" << "easypaint_en_EN" << "easypaint_cs_CZ" << "easypaint_fr_FR" << "easypaint_ru_RU" << "easypaint_zh_CN";
+    languages << "system" << "translations_en_EN" << "translations_cs_CZ" << "translations_fr_FR" << "translations_ru_RU" << "translations_zh_CN";
     DataSingleton::Instance()->setAppLanguage(languages.at(mLanguageBox->currentIndex()));
 
     QTreeWidgetItem *item;

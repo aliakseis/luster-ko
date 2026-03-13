@@ -314,8 +314,8 @@
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="413"/>
-        <source>&amp;About EasyPaint</source>
-        <translation>&amp;À propos de EasyPaint</translation>
+        <source>&amp;About lusterr-ko</source>
+        <translation>&amp;À propos de lusterr-ko</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="420"/>
@@ -348,8 +348,8 @@ Voulez-vous sauvegarder les changements?</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="849"/>
-        <source>About EasyPaint</source>
-        <translation>À propos de EasyPaint</translation>
+        <source>About lusterr-ko</source>
+        <translation>À propos de lusterr-ko</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="860"/>
@@ -368,7 +368,7 @@ Voulez-vous sauvegarder les changements?</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="861"/>
-        <source>If you like &lt;b&gt;EasyPaint&lt;/b&gt; and you want to share your opinion, or send a bug report, or want to suggest new features, we are waiting for you on our &lt;a href=&quot;https://github.com/Gr1N/EasyPaint/issues?milestone=&amp;sort=created&amp;direction=desc&amp;state=open&quot;&gt;tracker&lt;/a&gt;.</source>
+        <source>If you like &lt;b&gt;lusterr-ko&lt;/b&gt; and you want to share your opinion, or send a bug report, or want to suggest new features, we are waiting for you on our &lt;a href=&quot;https://github.com/aliakseis/lusterr-ko/issues?milestone=&amp;sort=created&amp;direction=desc&amp;state=open&quot;&gt;tracker&lt;/a&gt;.</source>
         <translation></translation>
     </message>
 </context>

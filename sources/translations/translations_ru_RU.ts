@@ -356,8 +356,8 @@
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="372"/>
-        <source>&amp;About EasyPaint</source>
-        <translation>&amp;О EasyPaint</translation>
+        <source>&amp;About lusterr-ko</source>
+        <translation>&amp;О lusterr-ko</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="379"/>
@@ -390,8 +390,8 @@ Do you want to save changes?</source>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="803"/>
-        <source>About EasyPaint</source>
-        <translation>О EasyPaint</translation>
+        <source>About lusterr-ko</source>
+        <translation>О lusterr-ko</translation>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="814"/>
@@ -405,8 +405,8 @@ Do you want to save changes?</source>
     </message>
     <message>
         <location filename="../mainwindow.cpp" line="815"/>
-        <source>If you like &lt;b&gt;EasyPaint&lt;/b&gt; and you want to share your opinion, or send a bug report, or want to suggest new features, we are waiting for you on our &lt;a href=&quot;https://github.com/Gr1N/EasyPaint/issues?milestone=&amp;sort=created&amp;direction=desc&amp;state=open&quot;&gt;tracker&lt;/a&gt;.</source>
-        <translation>Если вам понравится &lt;b&gt;EasyPaint&lt;/b&gt; и вы хотите поделиться своим мнением или сообщить об ошибке или предложить новые идеи, то мы вас ждем на нашем &lt;a href=\&quot;https://github.com/Gr1N/EasyPaint/issues?milestone=&amp;sort=created&amp;direction=desc&amp;state=open\&quot;&gt;трекере&lt;/a&gt;.</translation>
+        <source>If you like &lt;b&gt;lusterr-ko&lt;/b&gt; and you want to share your opinion, or send a bug report, or want to suggest new features, we are waiting for you on our &lt;a href=&quot;https://github.com/aliakseis/lusterr-ko/issues?milestone=&amp;sort=created&amp;direction=desc&amp;state=open&quot;&gt;tracker&lt;/a&gt;.</source>
+        <translation>Если вам понравится &lt;b&gt;lusterr-ko&lt;/b&gt; и вы хотите поделиться своим мнением или сообщить об ошибке или предложить новые идеи, то мы вас ждем на нашем &lt;a href=\&quot;https://github.com/aliakseis/lusterr-ko/issues?milestone=&amp;sort=created&amp;direction=desc&amp;state=open\&quot;&gt;трекере&lt;/a&gt;.</translation>
     </message>
     <message>
         <source>Copyright</source>

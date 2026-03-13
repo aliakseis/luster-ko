@@ -1,7 +1,7 @@
 /*
- * This source file is part of EasyPaint.
+ * This source file is part of luster-ko.
  *
- * Copyright (c) 2012 EasyPaint <https://github.com/Gr1N/EasyPaint>
+ * Copyright (c) 2026 luster-ko <https://github.com/aliakseis/luster-ko>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -38,7 +38,7 @@ ToolBar::ToolBar(const QMap<InstrumentsEnum, QAction *> &actMap, QWidget *parent
 {
     setMovable(false);
     initializeItems();
-    mPrevInstrumentSetted = false;
+    mPrevInstrumentSet = false;
 }
 
 QToolButton* ToolBar::createToolButton(QAction *act)

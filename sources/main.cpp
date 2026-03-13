@@ -1,7 +1,7 @@
 /*
- * This source file is part of EasyPaint.
+ * This source file is part of luster-ko.
  *
- * Copyright (c) 2012 EasyPaint <https://github.com/Gr1N/EasyPaint>
+ * Copyright (c) 2026 luster-ko <https://github.com/aliakseis/luster-ko>
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -44,8 +44,8 @@ namespace {
 
 void printHelpMessage()
 {
-    qDebug()<<"EasyPaint - simple graphics painting program\n"
-              "Usage: easypaint [options] [filename]\n\n"
+    qDebug()<<"luster-ko - simple graphics painting program\n"
+              "Usage: luster-ko [options] [filename]\n\n"
               "Options:\n"
               "\t-h, --help\t\tshow this help message and exit\n"
               "\t-v, --version\t\tshow program's version number and exit";
@@ -164,10 +164,10 @@ int main(int argc, char* argv[])
 
     a.installEventFilter(new KeypadNormalizer(qApp));
 
-    QApplication::setApplicationName("EasyPaint");
-    QApplication::setOrganizationName("EasyPaint");
+    QApplication::setApplicationName("luster-ko");
+    QApplication::setOrganizationName("aliakseis");
     QApplication::setOrganizationDomain("github.com");
-    QApplication::setApplicationVersion(EASYPAINT_VERSION);
+    QApplication::setApplicationVersion(APP_VERSION);
 
     QStringList args = a.arguments();
     QRegularExpression rxArgHelp(QStringLiteral("--help"));
@@ -262,12 +262,12 @@ int main(int argc, char* argv[])
 #ifdef Q_OS_WIN
         QDir(QApplication::applicationDirPath()).absoluteFilePath("translations/")
 #else
-        "/usr/share/easypaint/translations/"
+        "/usr/share/luster-ko/translations/"
 #endif
     );
     QString appLanguage = DataSingleton::Instance()->getAppLanguage();
     appTranslator.load(translationsPath + ((appLanguage == "system")
-        ? ("easypaint_" + QLocale::system().name())
+        ? ("translations_" + QLocale::system().name())
         : appLanguage));
     a.installTranslator(&appTranslator);
 

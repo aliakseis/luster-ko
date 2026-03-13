@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=0.0.1
 Type=Application
-Name=EasyPaint
+Name=luster-ko
 GenericName=Image Editor
 GenericName[ar]=محرر صور
 GenericName[ast]=Editor d'imaxe
@@ -120,8 +120,8 @@ Comment[vi]=Tạo và biên soạn ảnh hay ảnh chụp
 Comment[zh_CN]=创建图像或编辑照片
 Comment[zh_HK]=建立圖像與編輯照片
 Comment[zh_TW]=建立圖像與編輯照片
-Exec=easypaint %F
-TryExec=easypaint
+Exec=luster-ko %F
+TryExec=luster-ko
 Icon=easypaint_64
 Terminal=false
 Categories=Graphics;2DGraphics;RasterGraphics;Qt;
