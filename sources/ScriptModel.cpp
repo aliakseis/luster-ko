@@ -272,7 +272,7 @@ ScriptModel::ScriptModel(QWidget* parent, const QString& venvPath)
 #ifdef Q_OS_WIN
             QString scriptsPath = mVenvPath + "/Scripts";
 #else
-            QString scriptsPath = venvPath + "/bin";
+            QString scriptsPath = mVenvPath + "/bin";
 #endif
             QByteArray currentPath = qgetenv("PATH");
             qputenv("PATH", (scriptsPath + ";" + currentPath).toUtf8());
