@@ -36,7 +36,14 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
-          submodules: true  # Ensure submodules are checked out
+          submodules: true
+
+      # pin vcpkg to your local commit
+      - name: Checkout old vcpkg revision (Python 3.11)
+        run: |
+          cd ${{ env.vcpkg_path }}
+          git fetch --all
+          git checkout e1877ab371932bdb56cf5500199e743fd7f8e1be
 
       - name: Setup devcmd
         uses: ilammy/msvc-dev-cmd@v1
@@ -46,10 +53,8 @@ jobs:
           if ((Get-Command "ninja.exe" -ErrorAction SilentlyContinue) -eq $null) {
              choco install ninja
           }
-          where.exe ninja
           ninja --version
 
-      # https://learn.microsoft.com/en-us/vcpkg/users/binarycaching#gha
       - name: Set variables for vcpkg
         uses: actions/github-script@v7
         with:
@@ -59,25 +64,26 @@ jobs:
 
       - name: Install dependencies with vcpkg
         run: |
-          # create our own triplet for 64-bit
           New-Item `
             -Force `
             -ItemType File `
             -Path "${{ env.vcpkg_path }}/triplets_overlay/${{ matrix.vcpkg_triplet }}.cmake"
-          # OpenSSL isn't compatible with `/guard:cf` flag so we omit it for now, see: https://github.com/openssl/openssl/issues/22554
+
           Add-Content `
             -Path "${{ env.vcpkg_path }}/triplets_overlay/${{ matrix.vcpkg_triplet }}.cmake" `
             -Value @("set(VCPKG_TARGET_ARCHITECTURE ${{ matrix.platform }})",
               "set(VCPKG_LIBRARY_LINKAGE dynamic)",
               "set(VCPKG_CRT_LINKAGE dynamic)",
               "set(VCPKG_BUILD_TYPE release)")
-          # clear buildtrees after each package installation to reduce disk space requirements
+
           $packages = `
             "python3:${{ matrix.vcpkg_triplet }}",
             "pybind11:${{ matrix.vcpkg_triplet }}"
+
           ${{ env.vcpkg_path }}/vcpkg.exe upgrade `
             --no-dry-run `
             --overlay-triplets="${{ env.vcpkg_path }}/triplets_overlay"
+
           ${{ env.vcpkg_path }}/vcpkg.exe install `
             --binarysource="clear;x-gha,readwrite" `
             --clean-after-build `
@@ -104,6 +110,7 @@ jobs:
             -DMSVC_RUNTIME_DYNAMIC=ON `
             -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }} `
             -DVERBOSE_CONFIGURE=ON
+
           cmake --build build --config RelWithDebInfo
           cmake --install build --config RelWithDebInfo
 
