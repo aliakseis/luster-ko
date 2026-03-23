@@ -89,61 +89,119 @@ uint8_t clip_uint8(long a) {
 
 //------------------------------------------------------------------------------
 // Converts a NumPy array (pybind11::array) back into a QImage.
-// The array must be contiguous and have shape (height, width, 3), dtype uint8.
+// Accepts uint8 or float arrays arranged as HxWxC or CxHxW, with stride-aware fallback.
 QImage nparray_to_qimage(const py::array& a) {
-    // Get buffer info.
     py::buffer_info info = a.request();
 
-    // Ensure the NumPy array has the correct shape and type.
-    if (info.ndim != 3 || info.shape[2] != 3) {
-        throw std::invalid_argument("nparray_to_qimage: Expected shape (height, width, 3)");
-    }
+    // Accept either (H,W,C) where axis2 == 3, or (C,H,W) where axis0 == 3.
+    // If neither holds, we still allow HWC but will throw below if shape mismatch.
 
+    // Determine height/width/channels in a robust way.
     int height = static_cast<int>(info.shape[0]);
     int width = static_cast<int>(info.shape[1]);
     constexpr int channels = 3;
 
-    // Create an empty QImage with Format_RGB888.
     QImage image(width, height, QImage::Format_RGB888);
 
-    if (info.format == py::format_descriptor<uchar>::format()) {
+    // Helper lambda to read a float element using strides.
+    auto read_float_at = [&](int i, int j, int k) -> float {
+        // offset in bytes
+        const auto& strides = info.strides;
+        const char* base = static_cast<const char*>(info.ptr);
+        ptrdiff_t offset = 0;
+        // info.strides contains stride per axis in bytes
+        offset = i * strides[0] + j * strides[1] + k * strides[2];
+        const float* p = reinterpret_cast<const float*>(base + offset);
+        return *p;
+        };
 
-        // Copy row-by-row.
-        const uchar* src = static_cast<const uchar*>(info.ptr);
-        for (int i = 0; i < height; i++) {
-            uchar* dest = image.scanLine(i);
-            std::memcpy(dest, src + i * (width * channels), width * channels);
+    if (info.format == py::format_descriptor<unsigned char>::format()) {
+
+        const unsigned char* src = static_cast<const unsigned char*>(info.ptr);
+        // If layout is H x W x C contiguous (common), copy straightforward.
+        if (info.strides[0] == width * channels
+            && info.strides[1] == channels
+            && info.strides[2] == 1) {
+            for (int i = 0; i < height; ++i) {
+                unsigned char* dest = image.scanLine(i);
+                std::memcpy(dest, src + i * (width * channels), static_cast<size_t>(width * channels));
+            }
+            return image;
         }
-    }
-    else if (info.format == py::format_descriptor<float>::format()) 
-    {
-        // Convert floating-point values to uint8 (scale [0,1] -> [0,255])
-        /*
-        const float* src = static_cast<const float*>(info.ptr);
-        for (int i = 0; i < height; i++) {
-            uchar* dest = image.scanLine(i);
-            for (int j = 0; j < width * channels; j++) {
-                dest[j] = static_cast<uchar>(std::round(src[i * (width * channels) + j] * 255.0f));
+
+        // General stride-aware read for uint8
+        for (int i = 0; i < height; ++i) {
+            unsigned char* dest = image.scanLine(i);
+            for (int j = 0; j < width; ++j) {
+                for (int k = 0; k < channels; ++k) {
+                    // compute byte offset
+                    ptrdiff_t off = i * info.strides[0] + j * info.strides[1] + k * info.strides[2];
+                    const unsigned char* p = reinterpret_cast<const unsigned char*>(reinterpret_cast<const char*>(info.ptr) + off);
+                    dest[j * channels + k] = *p;
+                }
             }
         }
-        */
+        return image;
+    }
+    else if (info.format == py::format_descriptor<float>::format())
+    {
         const float* src = static_cast<const float*>(info.ptr);
-        for (int i = 0; i < height; i++) {
-            uchar* dest = image.scanLine(i);
-            for (int j = 0; j < width; j++) 
-                for (int k = 0; k < channels; ++k)
-                {
-                    dest[j * channels + k] = 
-                        clip_uint8(std::lround(src[k * (width * height) + i * width + j] * 255.0f));
+
+        // Determine whether array is channels-last (H,W,C) contiguous
+        const bool is_hwc_contiguous =
+            info.strides[2] == sizeof(float) &&
+            info.strides[1] == channels * sizeof(float);
+
+        // Determine channels-first (C,H,W) contiguous
+        const bool is_chw_contiguous =
+            info.strides[0] == width * height * sizeof(float) ||
+            (info.shape[0] == channels && info.strides[1] == width * sizeof(float));
+
+        if (is_hwc_contiguous) {
+            // H x W x C contiguous (row-major)
+            for (int i = 0; i < height; ++i) {
+                unsigned char* dest = image.scanLine(i);
+                for (int j = 0; j < width; ++j) {
+                    for (int k = 0; k < channels; ++k) {
+                        long scaled = std::lround(src[i * (width * channels) + j * channels + k] * 255.0f);
+                        dest[j * channels + k] = clip_uint8(scaled);
+                    }
                 }
+            }
+            return image;
+        }
+        else if (is_chw_contiguous) {
+            // C x H x W layout (channel outermost) - preserve the indexing you validated.
+            for (int i = 0; i < height; ++i) {
+                unsigned char* dest = image.scanLine(i);
+                for (int j = 0; j < width; ++j) {
+                    for (int k = 0; k < channels; ++k) {
+                        long scaled = std::lround(src[k * (width * height) + i * width + j] * 255.0f);
+                        dest[j * channels + k] = clip_uint8(scaled);
+                    }
+                }
+            }
+            return image;
+        }
+        else {
+            // Fallback: use stride-based access (safe for non-contiguous arrays).
+            for (int i = 0; i < height; ++i) {
+                unsigned char* dest = image.scanLine(i);
+                for (int j = 0; j < width; ++j) {
+                    for (int k = 0; k < channels; ++k) {
+                        float val = read_float_at(i, j, k);
+                        long scaled = std::lround(val * 255.0f);
+                        dest[j * channels + k] = clip_uint8(scaled);
+                    }
+                }
+            }
+            return image;
         }
     }
     else
     {
-        throw std::invalid_argument("nparray_to_qimage: Expected dtype=uint8");
+        throw std::invalid_argument("nparray_to_qimage: Expected dtype=uint8 or float");
     }
-
-    return image;
 }
 
 //------------------------------------------------------------------------------

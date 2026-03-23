@@ -114,6 +114,30 @@ def resize_image(image: np.ndarray, width: int = 320, height: int = 320) -> np.n
     """
     return cv2.resize(image, (width, height), interpolation=cv2.INTER_LINEAR)
 
+def extract_fragment(image: np.ndarray, x: int, y: int, width: int, height: int) -> np.ndarray:
+    """Extracts a rectangular fragment from an image.
+
+    Args:
+        image (np.ndarray): Input image as a NumPy array (BGR or grayscale).
+        x (int): Left coordinate of the fragment.
+        y (int): Top coordinate of the fragment.
+        width (int): Width of the fragment.
+        height (int): Height of the fragment.
+
+    Returns:
+        np.ndarray: Extracted image fragment.
+
+    Raises:
+        ValueError: If the requested fragment is out of image bounds.
+    """
+    h, w = image.shape[:2]
+
+    # Validate bounds
+    if x < 0 or y < 0 or x + width > w or y + height > h:
+        raise ValueError("Requested fragment is out of image bounds.")
+
+    return image[y:y + height, x:x + width]
+
 def generate_mandelbrot(width: int = 800, height: int = 800, max_iter: int = 100) -> np.ndarray:
     """Generates a Mandelbrot fractal image.
 
