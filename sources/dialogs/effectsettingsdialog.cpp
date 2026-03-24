@@ -289,30 +289,37 @@ QImage  EffectSettingsDialog::getChangedImage()
 
 void EffectSettingsDialog::accept()
 {
-    if (mApplyNeeded && !!mFutureContext)
+    if (mApplyNeeded)
     {
-        QMessageBox msgBox;
-        msgBox.setWindowTitle(tr("Simulation Parameters Changed"));
-        msgBox.setText(tr("The simulation parameters have changed. What would you like to do?"));
-        msgBox.setIcon(QMessageBox::Question);
-
-        // Add three buttons for clear choices
-        QPushButton* startNewBtn = msgBox.addButton(tr("Start New Simulation"), QMessageBox::AcceptRole);
-        QPushButton* continueBtn = msgBox.addButton(tr("Continue with Last Data"), QMessageBox::RejectRole);
-        QPushButton* stayBtn = msgBox.addButton(tr("Stay on This Screen"), QMessageBox::DestructiveRole);
-
-        msgBox.exec();  // Show the dialog and wait for user choice
-
-        // Handle user selection
-        if (msgBox.clickedButton() == startNewBtn) {
+        if (!mFutureContext)
+        {
             applyMatrix();
         }
-        else if (msgBox.clickedButton() == continueBtn) {
-            mApplyNeeded = false;
-        }
-        else {
-            // Stay on the screen (no action needed)
-            return;
+        else
+        {
+            QMessageBox msgBox;
+            msgBox.setWindowTitle(tr("Simulation Parameters Changed"));
+            msgBox.setText(tr("The simulation parameters have changed. What would you like to do?"));
+            msgBox.setIcon(QMessageBox::Question);
+
+            // Add three buttons for clear choices
+            QPushButton* startNewBtn = msgBox.addButton(tr("Start New Simulation"), QMessageBox::AcceptRole);
+            QPushButton* continueBtn = msgBox.addButton(tr("Continue with Last Data"), QMessageBox::RejectRole);
+            QPushButton* stayBtn = msgBox.addButton(tr("Stay on This Screen"), QMessageBox::DestructiveRole);
+
+            msgBox.exec();  // Show the dialog and wait for user choice
+
+            // Handle user selection
+            if (msgBox.clickedButton() == startNewBtn) {
+                applyMatrix();
+            }
+            else if (msgBox.clickedButton() == continueBtn) {
+                mApplyNeeded = false;
+            }
+            else {
+                // Stay on the screen (no action needed)
+                return;
+            }
         }
     }
     QDialog::accept();
