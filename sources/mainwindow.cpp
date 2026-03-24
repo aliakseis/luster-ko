@@ -304,6 +304,16 @@ void MainWindow::initializeMainMenu()
     mInstrumentsMenu->addSeparator();
 
     {
+        QAction* action = new QAction(tr("Transparent primary color"), this);
+        connect(action, SIGNAL(triggered()), this, SLOT(onTransparentPrimaryColor()));
+        mInstrumentsMenu->addAction(action);
+    }
+    {
+        QAction* action = new QAction(tr("Transparent secondary color"), this);
+        connect(action, SIGNAL(triggered()), this, SLOT(onTransparentSecondaryColor()));
+        mInstrumentsMenu->addAction(action);
+    }
+    {
         QAction* action = new QAction(tr("Markup mode"), this);
         action->setCheckable(true);
         connect(action, SIGNAL(triggered(bool)), this, SLOT(onMarkupMode(bool)));
@@ -772,6 +782,16 @@ void MainWindow::instumentsAct(bool state)
         if(currentAction == mInstrumentsActMap[CURSOR])
             DataSingleton::Instance()->setPreviousInstrument(mInstrumentsActMap.key(currentAction));
     }
+}
+
+void MainWindow::onTransparentPrimaryColor()
+{
+    DataSingleton::Instance()->setPrimaryColor(Qt::transparent);
+}
+
+void MainWindow::onTransparentSecondaryColor()
+{
+    DataSingleton::Instance()->setSecondaryColor(Qt::transparent);
 }
 
 void MainWindow::onMarkupMode(bool state)

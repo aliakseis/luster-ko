@@ -69,10 +69,19 @@ void EraserInstrument::mouseReleaseEvent(QMouseEvent *event, ImageArea &imageAre
 void EraserInstrument::paint(ImageArea &imageArea, bool, bool)
 {
     QPainter painter(imageArea.getImage());
-    painter.setPen(QPen(Qt::white,
-                        DataSingleton::Instance()->getPenSize(), // * imageArea.getZoomFactor(),
-                        Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    QColor color = DataSingleton::Instance()->getSecondaryColor();
+    int penSize = DataSingleton::Instance()->getPenSize();
 
+    if (color.alpha() == 0) {
+        // Transparent -> erase
+        painter.setCompositionMode(QPainter::CompositionMode_Clear);
+        painter.setPen(QPen(Qt::transparent, penSize, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    }
+    else {
+        // Opaque -> normal drawing
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        painter.setPen(QPen(color, penSize, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    }
     if(mStartPoint != mEndPoint)
     {
         painter.drawLine(mStartPoint, mEndPoint);

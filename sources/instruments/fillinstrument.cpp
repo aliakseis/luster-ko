@@ -80,7 +80,7 @@ void FillInstrument::paint(ImageArea &imageArea, bool isSecondaryColor, bool)
     if(switchColor != oldColor)
     {
         fillRecurs(mStartPoint.x(), mStartPoint.y(),
-                   switchColor.rgb(), oldColor.rgb(),
+                   switchColor.rgba(), oldColor.rgba(),
                    *imageArea.getImage());
     }
     imageArea.setEdited(true);

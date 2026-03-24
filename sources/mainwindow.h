@@ -151,6 +151,8 @@ private slots:
      * If some instrument has specific behavior, edit this slot.
      */
     void instumentsAct(bool state);
+    void onTransparentPrimaryColor();
+    void onTransparentSecondaryColor();
     void onMarkupMode(bool state);
     void enableActions(int index);
     void enableCopyCutActions(bool enable);
