@@ -21,7 +21,12 @@ pipe = StableDiffusionPipeline.from_pretrained(
 
 # Replace the default scheduler with a DPM scheduler.
 # This creates a DPMSolverMultistepScheduler instance with the same config as the pipeline's current scheduler.
-pipe.scheduler = DPMSolverMultistepScheduler.from_config(pipe.scheduler.config, use_karras_sigmas=True, algorithm_type="dpmsolver++")
+pipe.scheduler = DPMSolverMultistepScheduler.from_config(
+    pipe.scheduler.config,
+    use_karras_sigmas=True,
+    algorithm_type="dpmsolver++"
+)
+
 
 #pipe.enable_sequential_cpu_offload()
 pipe.enable_xformers_memory_efficient_attention()
@@ -29,6 +34,8 @@ pipe.enable_xformers_memory_efficient_attention()
 pipe.enable_attention_slicing()
 # Optional: For large image generation, you can also try VAE slicing.
 pipe.enable_vae_slicing()
+
+pipe.enable_vae_tiling()
 
 dlogging.set_verbosity_info()
 
@@ -261,17 +268,20 @@ def _callback(iter, i, t, extra_step_kwargs):
         raise RuntimeError("Interrupt detected! Stopping generation.")
 
     latents = extra_step_kwargs.get("latents")
+    if latents is None:
+        return extra_step_kwargs
+
     with torch.no_grad():
-        latents = 1 / 0.18215 * latents
-        #latents = 1 / 0.13025 * latents
-
-        image = pipe.vae.decode(latents).sample
-        
-        if image.dim() == 4:
-
-            image = (image / 2 + 0.5).clamp(0, 1).cpu().permute(0, 2, 3, 1).float().numpy()
-            #image = (image * 255).round().astype(np.uint8)
-
+        #latents = 1 / 0.18215 * latents
+        #image = pipe.vae.decode(latents).sample
+        #if image.dim() == 4:
+        #    image = (image / 2 + 0.5).clamp(0, 1).cpu().permute(0, 2, 3, 1).float().numpy()
+        #    #image = (image * 255).round().astype(np.uint8)
+        #    _send_image(image[-1])
+        decoded = pipe.vae.decode(latents / 0.18215).sample
+        if decoded.dim() == 4:
+            image = (decoded / 2 + 0.5).clamp(0, 1)
+            image = image.cpu().permute(0, 2, 3, 1).float().numpy()
             _send_image(image[-1])
 
     return extra_step_kwargs
@@ -289,7 +299,7 @@ def generate_image(prompt: str, negative_prompt: str = "", guidance_scale: float
         pipe,
         prompt,
         negative_prompt=negative_prompt,
-        base_emph=1.1
+        base_emph=1.05
     )
 
     # Cast embeddings to the same dtype as pipeline (important for fp16 models)
