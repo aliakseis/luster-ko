@@ -67,7 +67,7 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
         resize(winSize);
     }
 
-    setWindowIcon(QIcon(":/media/logo/easypaint_64.png"));
+    setWindowIcon(QIcon(":/media/logo/l_64.png"));
 
     mUndoStackGroup = new QUndoGroup(this);
 

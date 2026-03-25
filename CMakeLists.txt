@@ -198,7 +198,7 @@ target_link_libraries(${PROJECT}
 if(UNIX AND NOT APPLE)
     install(TARGETS luster-ko RUNTIME DESTINATION bin)
     install(FILES "sources/media/luster-ko.desktop" DESTINATION share/applications)
-    install(FILES "sources/media/logo/easypaint_64.png" DESTINATION share/pixmaps)
+    install(FILES "sources/media/logo/l_64.png" DESTINATION share/pixmaps)
     install(FILES ${TRANSLATIONS_QM} DESTINATION share/luster-ko/translations)
 endif()
 
