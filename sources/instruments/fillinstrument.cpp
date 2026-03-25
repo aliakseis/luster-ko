@@ -30,6 +30,105 @@
 #include <QPen>
 #include <QPainter>
 
+#include <QImage>
+#include <QRgb>
+#include <vector>
+#include <algorithm>
+#include <cmath>
+
+namespace {
+
+inline QRgb localMedianRGB(const QImage &img, int x, int y)
+{
+    int r[9], g[9], b[9];
+    int count = 0;
+
+    for(int dy = -1; dy <= 1; dy++)
+        for(int dx = -1; dx <= 1; dx++)
+        {
+            int xx = std::clamp(x + dx, 0, img.width()  - 1);
+            int yy = std::clamp(y + dy, 0, img.height() - 1);
+
+            QRgb p = img.pixel(xx, yy);
+
+            if (qAlpha(p) == 0)
+                return img.pixel(x, y);
+
+            r[count] = qRed(p);
+            g[count] = qGreen(p);
+            b[count] = qBlue(p);
+            count++;
+        }
+
+    std::nth_element(r, r + 4, r + 9);
+    std::nth_element(g, g + 4, g + 9);
+    std::nth_element(b, b + 4, b + 9);
+
+    return qRgb(r[4], g[4], b[4]);
+}
+
+const int SQ_TOLERANCE = 200;
+
+bool isSimilar(QRgb a, QRgb b)
+{
+    int dr = qRed(a) - qRed(b);
+    int dg = qGreen(a) - qGreen(b);
+    int db = qBlue(a) - qBlue(b);
+    return (dr * dr + dg * dg + db * db) <= SQ_TOLERANCE;
+}
+
+
+void fillRecurs(int x, int y, QRgb switchColor, QRgb oldColor, QImage& tempImage)
+{
+    int temp_x(x), left_x(0);
+    while (true)
+    {
+        if (!isSimilar(tempImage.pixel(temp_x, y), oldColor))
+            break;
+        tempImage.setPixel(temp_x, y, switchColor);
+        if (temp_x > 0)
+        {
+            --temp_x;
+            left_x = temp_x;
+        }
+        else
+            break;
+    }
+
+    int right_x(0);
+    temp_x = x + 1;
+    while (true)
+    {
+        if (!isSimilar(tempImage.pixel(temp_x, y), oldColor))
+            break;
+        tempImage.setPixel(temp_x, y, switchColor);
+        if (temp_x < tempImage.width() - 1)
+        {
+            temp_x++;
+            right_x = temp_x;
+        }
+        else
+            break;
+    }
+
+    for (int x_(left_x + 1); x_ < right_x; ++x_)
+    {
+        if (y < 1 || y >= tempImage.height() - 1)
+            break;
+        if (right_x > tempImage.width())
+            break;
+        QRgb currentColor = tempImage.pixel(x_, y - 1);
+        if (isSimilar(currentColor, oldColor) && currentColor != switchColor)
+            fillRecurs(x_, y - 1, switchColor, oldColor, tempImage);
+        currentColor = tempImage.pixel(x_, y + 1);
+        if (isSimilar(currentColor, oldColor) && currentColor != switchColor)
+            fillRecurs(x_, y + 1, switchColor, oldColor, tempImage);
+    }
+}
+
+} // namespace
+
+
 FillInstrument::FillInstrument(QObject *parent) :
     AbstractInstrument(parent)
 {
@@ -66,71 +165,25 @@ void FillInstrument::mouseReleaseEvent(QMouseEvent *event, ImageArea &imageArea)
     }
 }
 
-void FillInstrument::paint(ImageArea &imageArea, bool isSecondaryColor, bool)
+void FillInstrument::paint(ImageArea& imageArea, bool isSecondaryColor, bool)
 {
     QColor switchColor;
-    if(!isSecondaryColor)
+    if (!isSecondaryColor)
         switchColor = DataSingleton::Instance()->getPrimaryColor();
     else
         switchColor = DataSingleton::Instance()->getSecondaryColor();
 
-    QRgb pixel(imageArea.getImage()->pixel(mStartPoint));
-    QColor oldColor(pixel);
+    //QRgb pixel(imageArea.getImage()->pixel(mStartPoint));
+    //QColor oldColor(pixel);
+    auto oldColor = localMedianRGB(*imageArea.getImage(), mStartPoint.x(), mStartPoint.y());
 
-    if(switchColor != oldColor)
+    if (switchColor != oldColor)
     {
         fillRecurs(mStartPoint.x(), mStartPoint.y(),
-                   switchColor.rgba(), oldColor.rgba(),
-                   *imageArea.getImage());
+            switchColor.rgba(), oldColor,
+            *imageArea.getImage());
     }
+
     imageArea.setEdited(true);
     imageArea.update();
-}
-
-void FillInstrument::fillRecurs(int x, int y, QRgb switchColor, QRgb oldColor, QImage &tempImage)
-{
-    int temp_x(x), left_x(0);
-    while(true)
-    {
-        if(tempImage.pixel(temp_x, y) != oldColor)
-            break;
-        tempImage.setPixel(temp_x, y, switchColor);
-        if(temp_x > 0)
-        {
-            --temp_x;
-            left_x = temp_x;
-        }
-        else
-            break;
-    }
-
-    int right_x(0);
-    temp_x = x + 1;
-    while(true)
-    {
-        if(tempImage.pixel(temp_x, y) != oldColor)
-            break;
-        tempImage.setPixel(temp_x, y, switchColor);
-        if(temp_x < tempImage.width() - 1)
-        {
-            temp_x++;
-            right_x = temp_x;
-        }
-        else
-            break;
-    }
-
-    for(int x_(left_x+1); x_ < right_x; ++x_)
-    {
-        if(y < 1 || y >= tempImage.height() - 1)
-            break;
-        if(right_x > tempImage.width())
-            break;
-        QRgb currentColor = tempImage.pixel(x_, y - 1);
-        if(currentColor == oldColor && currentColor != switchColor)
-            fillRecurs(x_, y - 1, switchColor, oldColor, tempImage);
-        currentColor = tempImage.pixel(x_, y + 1);
-        if(currentColor == oldColor && currentColor != switchColor)
-            fillRecurs(x_, y + 1, switchColor, oldColor, tempImage);
-    }
 }

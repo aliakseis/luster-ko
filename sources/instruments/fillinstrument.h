@@ -46,10 +46,6 @@ public:
 
 protected:
     void paint(ImageArea &imageArea, bool isSecondaryColor = false, bool additionalFlag = false);
-
-private:
-    void fillRecurs(int x, int y, QRgb switchColor, QRgb oldColor, QImage &tempImage);
-    
 };
 
 #endif // FILLINSTRUMENT_H
