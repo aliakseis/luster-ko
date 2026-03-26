@@ -27,15 +27,19 @@ pipe.scheduler = DPMSolverMultistepScheduler.from_config(
     algorithm_type="dpmsolver++"
 )
 
+pipe.scheduler.config.noise_offset = 0.02
+pipe.scheduler.config.sigma_min = 0.03
 
 #pipe.enable_sequential_cpu_offload()
 pipe.enable_xformers_memory_efficient_attention()
 # Optional: Enable attention slicing (helps with memory usage) without quality loss.
 pipe.enable_attention_slicing()
 # Optional: For large image generation, you can also try VAE slicing.
-pipe.enable_vae_slicing()
+#pipe.enable_vae_slicing()
+#pipe.enable_vae_tiling()
 
-pipe.enable_vae_tiling()
+pipe.vae.enable_slicing()
+pipe.vae.enable_tiling()
 
 dlogging.set_verbosity_info()
 
