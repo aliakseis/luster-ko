@@ -314,7 +314,6 @@ private:
     // Interior state (moved from previous ScriptModel)
     bool mValid = false;
     std::weak_ptr<EffectRunCallback> mCallback;
-    std::mutex mCallMutex;
     std::vector<FunctionInfo> mFunctionInfos;
     std::atomic_bool mIsShuttingDown = false;
     QString mVenvPath;
@@ -393,8 +392,6 @@ void ScriptModelImpl::loadScript(const QString& path)
 {
     if (!mValid)
         return;
-
-    std::unique_lock<std::mutex> lock(mCallMutex);
 
     py::gil_scoped_acquire acquire;
 
@@ -541,7 +538,6 @@ void ScriptModelImpl::loadScript(const QString& path)
 
 std::vector<FunctionInfo> ScriptModelImpl::getFunctionInfos()
 {
-    std::lock_guard<std::mutex> lock(mCallMutex);
     return mFunctionInfos; // copy
 }
 
@@ -558,8 +554,6 @@ QVariant ScriptModelImpl::callFunction(const QString& callable, const QVariantLi
         if (obj->isInterrupted())
             return {};
     }
-
-    std::unique_lock<std::mutex> lock(mCallMutex);
 
     py::gil_scoped_acquire acquire;
 
@@ -679,15 +673,7 @@ void ScriptModel::setupActions(QMenu* fileMenu, QMenu* effectsMenu, QMap<int, QA
 {
     if (!mImpl) return;
 
-    // Request function infos from impl (blocking)
-    std::vector<FunctionInfo> infos;
-    bool ok = QMetaObject::invokeMethod(mImpl.get(),
-        [&infos, this]() { infos = mImpl->getFunctionInfos(); },
-        Qt::BlockingQueuedConnection);
-    if (!ok) {
-        qWarning() << "Failed to get function infos from impl.";
-        return;
-    }
+    std::vector<FunctionInfo> infos = mImpl->getFunctionInfos();
 
     // Create QAction objects in caller (GUI) thread as before, using infos
     const auto parent = this->parent();
