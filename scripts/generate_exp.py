@@ -2,7 +2,7 @@ import logging
 from diffusers import logging as dlogging
 import torch
 import random
-from diffusers import StableDiffusionPipeline, DPMSolverMultistepScheduler
+from diffusers import StableDiffusionPipeline, StableDiffusionImg2ImgPipeline, DPMSolverMultistepScheduler
 import numpy as np
 import re
 from typing import List, Tuple
@@ -11,35 +11,43 @@ logger = logging.getLogger("diffusers")
 
 device = "cuda"
 
+model_id = "runwayml/stable-diffusion-v1-5"
+
+
 # Load the pipeline correctly
 pipe = StableDiffusionPipeline.from_pretrained(
-    "runwayml/stable-diffusion-v1-5",
+    model_id,
     torch_dtype=torch.float16,
     use_safetensors=True,
-    safety_checker=None
+    safety_checker=None,
+).to(device)
+
+# img2img
+img2img_pipe = StableDiffusionImg2ImgPipeline(
+    vae=pipe.vae,
+    text_encoder=pipe.text_encoder,
+    tokenizer=pipe.tokenizer,
+    unet=pipe.unet,
+    scheduler=pipe.scheduler,
+    safety_checker=None,
+    feature_extractor=None,
 ).to(device)
 
 # Replace the default scheduler with a DPM scheduler.
 # This creates a DPMSolverMultistepScheduler instance with the same config as the pipeline's current scheduler.
-pipe.scheduler = DPMSolverMultistepScheduler.from_config(
-    pipe.scheduler.config,
-    use_karras_sigmas=True,
-    algorithm_type="dpmsolver++"
-)
+for p in (pipe, img2img_pipe):
+    p.scheduler = DPMSolverMultistepScheduler.from_config(
+        p.scheduler.config,
+        use_karras_sigmas=True,
+        algorithm_type="dpmsolver++",
+    )
+    p.scheduler.config.noise_offset = 0.02
+    p.scheduler.config.sigma_min = 0.03
 
-pipe.scheduler.config.noise_offset = 0.02
-pipe.scheduler.config.sigma_min = 0.03
-
-#pipe.enable_sequential_cpu_offload()
-pipe.enable_xformers_memory_efficient_attention()
-# Optional: Enable attention slicing (helps with memory usage) without quality loss.
-pipe.enable_attention_slicing()
-# Optional: For large image generation, you can also try VAE slicing.
-#pipe.enable_vae_slicing()
-#pipe.enable_vae_tiling()
-
-pipe.vae.enable_slicing()
-pipe.vae.enable_tiling()
+    p.enable_xformers_memory_efficient_attention()
+    p.enable_attention_slicing()
+    p.vae.enable_slicing()
+    p.vae.enable_tiling()
 
 dlogging.set_verbosity_info()
 
@@ -290,37 +298,68 @@ def _callback(iter, i, t, extra_step_kwargs):
 
     return extra_step_kwargs
 
+# --- Refiner pass -------------------------------------------------------------
+def _refine_image(
+    image,
+    cond_embeds,
+    cond_mask,
+    neg_embeds,
+    neg_mask,
+    gen,
+    strength: float = 0.25,
+    steps: int = 12,
+    cfg: float = 5.0,
+):
+    image = image.convert("RGB")
+
+    refined = img2img_pipe(
+        prompt_embeds=cond_embeds,
+        attention_mask=cond_mask,
+        negative_prompt_embeds=neg_embeds,
+        negative_attention_mask=neg_mask,
+        image=image,
+        strength=strength,
+        guidance_scale=cfg,
+        num_inference_steps=steps,
+        generator=gen,
+        callback_on_step_end=_callback,
+    )
+    return refined.images[0]
+
 # Correct function signature with parameters
-def generate_image(prompt: str, negative_prompt: str = "", guidance_scale: float = 7.5, num_steps: int = 50, seed: int = -1):
+def generate_image(
+    prompt: str,
+    negative_prompt: str = "",
+    guidance_scale: float = 7.5,
+    num_steps: int = 50,
+    seed: int = -1,
+    use_refiner: bool = False,
+    refiner_strength: float = 0.25,
+    refiner_steps: int = 12,
+    refiner_cfg: float = 5.0,
+):
     if seed == -1:
         seed = random.randint(0, 2**31 - 1)
     gen = torch.Generator(device=device).manual_seed(seed)
     logger.info(f'Using seed: {seed}')
 
-
-    # === 1. Convert weighted prompt into embeddings ===
     cond_embeds, cond_mask, neg_embeds, neg_mask = _build_prompt_embeds(
         pipe,
         prompt,
         negative_prompt=negative_prompt,
-        base_emph=1.05
+        base_emph=1.05,
     )
 
-    # Cast embeddings to the same dtype as pipeline (important for fp16 models)
     cond_embeds = cond_embeds.to(dtype=pipe.text_encoder.dtype, device=pipe.device)
     neg_embeds = neg_embeds.to(dtype=pipe.text_encoder.dtype, device=pipe.device)
     cond_mask = cond_mask.to(pipe.device)
     neg_mask = neg_mask.to(pipe.device)
 
-
-    # cond_embeds: (1, seq_cond, dim), cond_mask: (1, seq_cond)
-    # neg_embeds: (1, seq_neg, dim), neg_mask: (1, seq_neg)
     cond_embeds, cond_mask, neg_embeds, neg_mask = _pad_embeds_and_masks(
         cond_embeds, cond_mask, neg_embeds, neg_mask,
-        dtype=cond_embeds.dtype, device=cond_embeds.device
+        dtype=cond_embeds.dtype, device=cond_embeds.device,
     )
 
-    # === 2. Generate image using precomputed embeddings ===
     image = pipe(
         prompt_embeds=cond_embeds,
         attention_mask=cond_mask,
@@ -329,6 +368,20 @@ def generate_image(prompt: str, negative_prompt: str = "", guidance_scale: float
         guidance_scale=guidance_scale,
         num_inference_steps=num_steps,
         generator=gen,
-        callback_on_step_end=_callback
+        callback_on_step_end=_callback,
     ).images[0]
-    return np.array(image)  # Convert RGB to BGR (OpenCV format)
+
+    if use_refiner:
+        image = _refine_image(
+            image=image,
+            cond_embeds=cond_embeds,
+            cond_mask=cond_mask,
+            neg_embeds=neg_embeds,
+            neg_mask=neg_mask,
+            gen=gen,
+            strength=refiner_strength,
+            steps=refiner_steps,
+            cfg=refiner_cfg,
+        )
+
+    return np.array(image)
