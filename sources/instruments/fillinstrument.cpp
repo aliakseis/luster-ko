@@ -78,51 +78,55 @@ bool isSimilar(QRgb a, QRgb b)
 }
 
 
-void fillRecurs(int x, int y, QRgb switchColor, QRgb oldColor, QImage& tempImage)
+void fill(int x, int y, QRgb switchColor, QRgb oldColor, QImage& tempImage)
 {
-    int temp_x(x), left_x(0);
-    while (true)
-    {
-        if (!isSimilar(tempImage.pixel(temp_x, y), oldColor))
-            break;
-        tempImage.setPixel(temp_x, y, switchColor);
-        if (temp_x > 0)
-        {
-            --temp_x;
-            left_x = temp_x;
-        }
-        else
-            break;
-    }
+    const int width = tempImage.width();
+    const int height = tempImage.height();
 
-    int right_x(0);
-    temp_x = x + 1;
-    while (true)
-    {
-        if (!isSimilar(tempImage.pixel(temp_x, y), oldColor))
-            break;
-        tempImage.setPixel(temp_x, y, switchColor);
-        if (temp_x < tempImage.width() - 1)
-        {
-            temp_x++;
-            right_x = temp_x;
-        }
-        else
-            break;
-    }
+    if (x < 0 || x >= width || y < 0 || y >= height)
+        return;
+    if (!isSimilar(tempImage.pixel(x, y), oldColor))
+        return;
 
-    for (int x_(left_x + 1); x_ < right_x; ++x_)
-    {
-        if (y < 1 || y >= tempImage.height() - 1)
-            break;
-        if (right_x > tempImage.width())
-            break;
-        QRgb currentColor = tempImage.pixel(x_, y - 1);
-        if (isSimilar(currentColor, oldColor) && currentColor != switchColor)
-            fillRecurs(x_, y - 1, switchColor, oldColor, tempImage);
-        currentColor = tempImage.pixel(x_, y + 1);
-        if (isSimilar(currentColor, oldColor) && currentColor != switchColor)
-            fillRecurs(x_, y + 1, switchColor, oldColor, tempImage);
+    std::vector<std::pair<int,int>> stack;
+    stack.reserve(256);
+    stack.emplace_back(x, y);
+
+    while (!stack.empty()) {
+        const auto [cx, cy] = stack.back();
+        stack.pop_back();
+
+        // scan left from cx
+        int left = cx - 1;
+        while (left >= 0 && isSimilar(tempImage.pixel(left, cy), oldColor)) {
+            tempImage.setPixel(left, cy, switchColor);
+            --left;
+        }
+
+        // scan right from cx+1
+        int right = cx + 1;
+        while (right < width && isSimilar(tempImage.pixel(right, cy), oldColor)) {
+            tempImage.setPixel(right, cy, switchColor);
+            ++right;
+        }
+
+        // for each pixel in the filled span, check above and below
+        for (int xx = left + 1; xx < right; ++xx) {
+            if (cy > 0) {
+                QRgb currentColor = tempImage.pixel(xx, cy - 1);
+                if (isSimilar(currentColor, oldColor) && currentColor != switchColor) {
+                    tempImage.setPixel(xx, cy - 1, switchColor);
+                    stack.emplace_back(xx, cy - 1);
+                }
+            }
+            if (cy < height - 1) {
+                QRgb currentColor = tempImage.pixel(xx, cy + 1);
+                if (isSimilar(currentColor, oldColor) && currentColor != switchColor) {
+                    tempImage.setPixel(xx, cy + 1, switchColor);
+                    stack.emplace_back(xx, cy + 1);
+                }
+            }
+        }
     }
 }
 
@@ -179,7 +183,7 @@ void FillInstrument::paint(ImageArea& imageArea, bool isSecondaryColor, bool)
 
     if (switchColor != oldColor)
     {
-        fillRecurs(mStartPoint.x(), mStartPoint.y(),
+        fill(mStartPoint.x(), mStartPoint.y(),
             switchColor.rgba(), oldColor,
             *imageArea.getImage());
     }

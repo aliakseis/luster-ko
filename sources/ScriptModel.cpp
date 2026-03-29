@@ -671,26 +671,51 @@ void ScriptModel::LoadScript(const QString& path)
 
 void ScriptModel::setupActions(QMenu* fileMenu, QMenu* effectsMenu, QMap<int, QAction*>& effectsActMap)
 {
-    if (!mImpl) return;
+    if (!mImpl)
+        return;
 
     std::vector<FunctionInfo> infos = mImpl->getFunctionInfos();
+    if (infos.empty())
+        return;
 
-    // Create QAction objects in caller (GUI) thread as before, using infos
     const auto parent = this->parent();
-    const auto firstAction = fileMenu->actions().isEmpty() ? nullptr : fileMenu->actions().constFirst();
+
+    bool fileSepAdded = false;
+    bool effectsSepAdded = false;
+
+    QAction* separator = nullptr;
+
     for (const auto& funcInfo : infos) {
         QAction* effectAction = new QAction(funcInfo.fullName, parent);
         if (funcInfo.isCreatingFunction())
         {
+            // Add separator before creating-function block only once and only if there are existing items.
+            if (!fileSepAdded) {
+                if (!fileMenu->actions().isEmpty()) {
+                    const auto firstAction = fileMenu->actions().constFirst();
+                    separator = fileMenu->insertSeparator(firstAction);
+                }
+                fileSepAdded = true;
+            }
+
             auto effect = funcInfo.parameters.empty()
                 ? static_cast<AbstractEffect*>(new ScriptEffect(this, funcInfo))
                 : new ScriptEffectWithSettings(this, funcInfo);
 
             QObject::connect(effectAction, &QAction::triggered, [effect] { effect->applyEffect(nullptr); });
-            fileMenu->insertAction(firstAction, effectAction);  // Insert at the start
+            fileMenu->insertAction(separator, effectAction);  // Insert at the start
         }
         else
         {
+            // Add separator before appending to effects menu only once and only if menu already has items.
+            if (!effectsSepAdded) {
+                if (!effectsMenu->actions().isEmpty()) {
+                    effectsMenu->addSeparator();
+                }
+                effectsSepAdded = true;
+            }
+
+            // Use DataSingleton to register each function.
             const int type = DataSingleton::Instance()->addScriptActionHandler(this, funcInfo);
             QObject::connect(effectAction, SIGNAL(triggered()), parent, SLOT(effectsAct()));
             effectsMenu->addAction(effectAction);
