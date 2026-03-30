@@ -33,6 +33,7 @@
 #include <QImage>
 #include <QRgb>
 #include <vector>
+#include <map>
 #include <algorithm>
 #include <cmath>
 
@@ -88,6 +89,8 @@ void fill(int x, int y, QRgb switchColor, QRgb oldColor, QImage& tempImage)
     if (!isSimilar(tempImage.pixel(x, y), oldColor))
         return;
 
+    std::map<std::pair<int, int>, int> neighbors;
+
     std::vector<std::pair<int,int>> stack;
     stack.reserve(256);
     stack.emplace_back(x, y);
@@ -98,34 +101,63 @@ void fill(int x, int y, QRgb switchColor, QRgb oldColor, QImage& tempImage)
 
         // scan left from cx
         int left = cx - 1;
-        while (left >= 0 && isSimilar(tempImage.pixel(left, cy), oldColor)) {
+        bool leftFilled = false;
+        while (left >= 0) {
+            QRgb currentColor = tempImage.pixel(left, cy);
+            leftFilled = currentColor == switchColor;
+            if (leftFilled || !isSimilar(currentColor, oldColor))
+                break;
             tempImage.setPixel(left, cy, switchColor);
             --left;
         }
 
         // scan right from cx+1
         int right = cx + 1;
-        while (right < width && isSimilar(tempImage.pixel(right, cy), oldColor)) {
+        bool rightFilled = false;
+        while (right < width) {
+            QRgb currentColor = tempImage.pixel(right, cy);
+            rightFilled = currentColor == switchColor;
+            if (rightFilled || !isSimilar(currentColor, oldColor))
+                break;
             tempImage.setPixel(right, cy, switchColor);
             ++right;
         }
+
+        if (left >= 0 && !leftFilled)
+            ++neighbors[{left, cy}];
+        if (right < width && !rightFilled)
+            ++neighbors[{right, cy}];
 
         // for each pixel in the filled span, check above and below
         for (int xx = left + 1; xx < right; ++xx) {
             if (cy > 0) {
                 QRgb currentColor = tempImage.pixel(xx, cy - 1);
-                if (isSimilar(currentColor, oldColor) && currentColor != switchColor) {
-                    tempImage.setPixel(xx, cy - 1, switchColor);
-                    stack.emplace_back(xx, cy - 1);
-                }
+                if (currentColor != switchColor)
+                    if (isSimilar(currentColor, oldColor)) {
+                        tempImage.setPixel(xx, cy - 1, switchColor);
+                        stack.emplace_back(xx, cy - 1);
+                    }
+                    else
+                        ++neighbors[{xx, cy - 1}];
             }
             if (cy < height - 1) {
                 QRgb currentColor = tempImage.pixel(xx, cy + 1);
-                if (isSimilar(currentColor, oldColor) && currentColor != switchColor) {
-                    tempImage.setPixel(xx, cy + 1, switchColor);
-                    stack.emplace_back(xx, cy + 1);
+                if (currentColor != switchColor)
+                    if (isSimilar(currentColor, oldColor)) {
+                        tempImage.setPixel(xx, cy + 1, switchColor);
+                        stack.emplace_back(xx, cy + 1);
+                    }
+                    else
+                        ++neighbors[{xx, cy + 1}];
                 }
-            }
+        }
+    }
+
+    for (auto& nb : neighbors)
+    {
+        if (nb.second >= 3)
+        {
+            tempImage.setPixel(nb.first.first, nb.first.second, switchColor);
         }
     }
 }
