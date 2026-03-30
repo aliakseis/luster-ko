@@ -181,7 +181,7 @@ EffectSettingsDialog::EffectSettingsDialog(const QImage* img, const QImage* mark
     mPreviewView->setDragMode(QGraphicsView::ScrollHandDrag);  // Enable panning with mouse drag
     mPreviewView->setTransformationAnchor(QGraphicsView::AnchorUnderMouse);  // Zoom where the cursor is
 
-    mOkButton = new QPushButton(tr("Ok"), this);
+    mOkButton = new QPushButton(tr("OK"), this);
     connect(mOkButton, SIGNAL(clicked()), this, SLOT(accept()));
     mCancelButton = new QPushButton(tr("Cancel"), this);
     connect(mCancelButton, SIGNAL(clicked()), this, SLOT(reject()));
