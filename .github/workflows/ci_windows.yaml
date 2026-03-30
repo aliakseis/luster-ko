@@ -17,12 +17,12 @@ jobs:
 
     strategy:
       matrix:
-        platform: [x86, x64]
+        platform: [x64]
         include:
-          - platform: x86
-            arch: Win32
-            qt_arch: win32_msvc2019
-            vcpkg_triplet: x86-windows-md-release
+        #  - platform: x86
+        #    arch: Win32
+        #    qt_arch: win32_msvc2019
+        #    vcpkg_triplet: x86-windows-md-release
           - platform: x64
             arch: x64
             qt_arch: win64_msvc2019_64
