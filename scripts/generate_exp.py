@@ -607,9 +607,18 @@ def _refine_image(
     return refined.images[0]
 
 
-# ------------------------------------------------------------------------------
-# Main generation function
-# ------------------------------------------------------------------------------
+# ---------------------------------------------------------
+# Global cache for txt2img only
+# ---------------------------------------------------------
+_txt2img_cache = {
+    "params": None,
+    "image": None,
+    "cond_embeds": None,
+    "cond_mask": None,
+    "neg_embeds": None,
+    "neg_mask": None,
+}
+
 
 def generate_image(
     prompt: str,
@@ -627,55 +636,94 @@ def generate_image(
 ):
     """
     Main image generation:
-    - txt2img
+    - txt2img (cached)
     - optional outpaint
     - optional refiner
     """
 
+    global _txt2img_cache
+
+    # ---------------------------------------------------------
+    # 0. Seed
+    # ---------------------------------------------------------
     if seed == -1:
         seed = random.randint(0, 2**31 - 1)
-    gen = torch.Generator(device=device).manual_seed(seed)
     logger.info(f'Using seed: {seed}')
+    gen = torch.Generator(device=device).manual_seed(seed)
 
-    # Build prompt embeddings
-    cond_embeds, cond_mask, neg_embeds, neg_mask = _build_prompt_embeds(
-        pipe,
+    # ---------------------------------------------------------
+    # 1. Cache key ONLY for txt2img
+    # ---------------------------------------------------------
+    txt2img_key = (
         prompt,
-        negative_prompt=negative_prompt,
-        base_emph=1.05,
+        negative_prompt,
+        guidance_scale,
+        num_steps,
+        seed,
     )
 
-    # Move embeddings to correct dtype/device
-    cond_embeds = cond_embeds.to(dtype=pipe.text_encoder.dtype, device=pipe.device)
-    neg_embeds = neg_embeds.to(dtype=pipe.text_encoder.dtype, device=pipe.device)
-    cond_mask = cond_mask.to(pipe.device)
-    neg_mask = neg_mask.to(pipe.device)
+    # ---------------------------------------------------------
+    # 2. Try using cached txt2img
+    # ---------------------------------------------------------
+    if _txt2img_cache["params"] == txt2img_key:
+        logger.info("Using cached txt2img result")
 
-    # Pad embeddings so both conditional and negative have equal sequence length
-    cond_embeds, cond_mask, neg_embeds, neg_mask = _pad_embeds_and_masks(
-        cond_embeds, cond_mask, neg_embeds, neg_mask,
-        dtype=cond_embeds.dtype, device=cond_embeds.device,
-    )
+        image = _txt2img_cache["image"].copy()
+        cond_embeds = _txt2img_cache["cond_embeds"]
+        cond_mask   = _txt2img_cache["cond_mask"]
+        neg_embeds  = _txt2img_cache["neg_embeds"]
+        neg_mask    = _txt2img_cache["neg_mask"]
 
-    # ----------------------------------------------------------------------
-    # 1. Base txt2img generation (uses the original callback)
-    # ----------------------------------------------------------------------
-    image = pipe(
-        prompt_embeds=cond_embeds,
-        attention_mask=cond_mask,
-        negative_prompt_embeds=neg_embeds,
-        negative_attention_mask=neg_mask,
-        guidance_scale=guidance_scale,
-        num_inference_steps=num_steps,
-        generator=gen,
-        callback_on_step_end=_callback,   # old callback stays untouched
-    ).images[0]
+    else:
+        # ---------------------------------------------------------
+        # 3. Build prompt embeddings
+        # ---------------------------------------------------------
+        cond_embeds, cond_mask, neg_embeds, neg_mask = _build_prompt_embeds(
+            pipe,
+            prompt,
+            negative_prompt=negative_prompt,
+            base_emph=1.05,
+        )
 
-    #image = image.transpose(Image.FLIP_LEFT_RIGHT)
+        # Move embeddings to correct dtype/device
+        cond_embeds = cond_embeds.to(dtype=pipe.text_encoder.dtype, device=pipe.device)
+        neg_embeds = neg_embeds.to(dtype=pipe.text_encoder.dtype, device=pipe.device)
+        cond_mask = cond_mask.to(pipe.device)
+        neg_mask = neg_mask.to(pipe.device)
 
-    # ----------------------------------------------------------------------
-    # 2. Optional outpainting (only if at least one expand flag is enabled)
-    # ----------------------------------------------------------------------
+        # Pad embeddings so both conditional and negative have equal sequence length
+        cond_embeds, cond_mask, neg_embeds, neg_mask = _pad_embeds_and_masks(
+            cond_embeds, cond_mask, neg_embeds, neg_mask,
+            dtype=cond_embeds.dtype, device=cond_embeds.device,
+        )
+
+        # ---------------------------------------------------------
+        # 4. Base txt2img generation
+        # ---------------------------------------------------------
+        image = pipe(
+            prompt_embeds=cond_embeds,
+            attention_mask=cond_mask,
+            negative_prompt_embeds=neg_embeds,
+            negative_attention_mask=neg_mask,
+            guidance_scale=guidance_scale,
+            num_inference_steps=num_steps,
+            generator=gen,
+            callback_on_step_end=_callback,
+        ).images[0]
+
+        # ---------------------------------------------------------
+        # 5. Save txt2img + embeddings to cache
+        # ---------------------------------------------------------
+        _txt2img_cache["params"] = txt2img_key
+        _txt2img_cache["image"] = np.array(image).copy()
+        _txt2img_cache["cond_embeds"] = cond_embeds
+        _txt2img_cache["cond_mask"]   = cond_mask
+        _txt2img_cache["neg_embeds"]  = neg_embeds
+        _txt2img_cache["neg_mask"]    = neg_mask
+
+    # ---------------------------------------------------------
+    # 6. Optional outpainting
+    # ---------------------------------------------------------
     if expand_left_or_top or expand_right_or_bottom:
         image = _expand_with_inpaint(
             image=image,
@@ -691,9 +739,9 @@ def generate_image(
             cfg=guidance_scale,
         )
 
-    # ----------------------------------------------------------------------
-    # 3. Optional refiner pass (uses the original callback)
-    # ----------------------------------------------------------------------
+    # ---------------------------------------------------------
+    # 7. Optional refiner
+    # ---------------------------------------------------------
     if use_refiner:
         image = _refine_image(
             image=image,
@@ -707,5 +755,7 @@ def generate_image(
             cfg=refiner_cfg,
         )
 
-    # Return final numpy array
+    # ---------------------------------------------------------
+    # 8. Return final numpy array
+    # ---------------------------------------------------------
     return np.array(image)
