@@ -715,7 +715,7 @@ def generate_image(
         # 5. Save txt2img + embeddings to cache
         # ---------------------------------------------------------
         _txt2img_cache["params"] = txt2img_key
-        _txt2img_cache["image"] = np.array(image).copy()
+        _txt2img_cache["image"] = image.copy()
         _txt2img_cache["cond_embeds"] = cond_embeds
         _txt2img_cache["cond_mask"]   = cond_mask
         _txt2img_cache["neg_embeds"]  = neg_embeds
