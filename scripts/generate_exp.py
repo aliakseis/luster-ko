@@ -325,7 +325,7 @@ def _make_blur_padding_and_mask(
     top_pad,
     bottom_pad,
     feather=30,
-    min_alpha=0.2,
+    min_alpha=0.3,
 ):
     h, w, _ = img_np.shape
     new_h = h + top_pad + bottom_pad
@@ -384,8 +384,9 @@ def _make_blur_padding_and_mask(
     
     bg = inpainted.astype(np.uint8)
     #bg[top_pad:top_pad + h, left_pad:left_pad + w] = img_np
-    noise_sigma = 3
-    noise = np.random.normal(0, noise_sigma, bg.shape).astype(np.int16)
+    noise_sigma = 4
+    rng = np.random.default_rng(123456)
+    noise = rng.normal(0, noise_sigma, bg.shape).astype(np.int16)
     bg_noisy = np.clip(bg.astype(np.int16) + noise, 0, 255).astype(np.uint8)
     bg_noisy[top_pad:top_pad + h, left_pad:left_pad + w] = img_np
     bg = bg_noisy
@@ -720,6 +721,8 @@ def generate_image(
         _txt2img_cache["cond_mask"]   = cond_mask
         _txt2img_cache["neg_embeds"]  = neg_embeds
         _txt2img_cache["neg_mask"]    = neg_mask
+
+        gen = torch.Generator(device=device).manual_seed(seed)
 
     # ---------------------------------------------------------
     # 6. Optional outpainting
