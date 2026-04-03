@@ -39,8 +39,6 @@
 
 #include <QtCore/QSettings>
 
-DataSingleton* DataSingleton::m_pInstance = 0;
-
 DataSingleton::DataSingleton()
 {
     mPrimaryColor = Qt::black;
@@ -65,10 +63,8 @@ DataSingleton::DataSingleton()
 
 DataSingleton* DataSingleton::Instance()
 {
-    if(!m_pInstance)
-        m_pInstance = new DataSingleton;
-
-    return m_pInstance;
+    static DataSingleton instance;
+    return &instance;
 }
 
 void DataSingleton::readSetting()

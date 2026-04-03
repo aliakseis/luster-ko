@@ -1,9 +1,26 @@
-cmake_minimum_required (VERSION 3.5)
-
-set(CMAKE_CXX_STANDARD 17)
+cmake_minimum_required(VERSION 3.5)
 
 # set project's name
 set (PROJECT luster-ko)
+
+project(${PROJECT} LANGUAGES CXX)
+
+# Force C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# Prefer Ninja, but allow others. Add common warning flags.
+if (MSVC)
+  add_compile_options(/W4)
+else()
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+# Example: for each target use modern target properties
+# target_compile_features(my_target PRIVATE cxx_std_17)
+# target_include_directories(my_target PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/sources)
+
 
 message(STATUS "System: " ${CMAKE_HOST_SYSTEM_NAME} " " ${CMAKE_HOST_SYSTEM_VERSION})
 message(STATUS "Processor: " ${CMAKE_HOST_SYSTEM_PROCESSOR})
@@ -135,8 +152,6 @@ if(NOT NO_TRANSLATIONS)
         sources/translations/translations_zh_CN.ts
         sources/translations/translations_fr_FR.ts)
 endif(NOT NO_TRANSLATIONS)
-
-project (${PROJECT})
 
 include_directories (./)
 
