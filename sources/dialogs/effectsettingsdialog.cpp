@@ -96,6 +96,8 @@ public:
     FutureContext(EffectSettingsDialog* dlg) : mainWindow(GetMainWindow()),
         mEffectRunCallback(new EffectRunCallback(), std::mem_fn(&QObject::deleteLater))
     {
+        QObject::connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit,
+            mEffectRunCallback.get(), &EffectRunCallback::interrupt);
         QObject::connect(mEffectRunCallback.get(), &EffectRunCallback::sendImage, dlg, &EffectSettingsDialog::updatePreview);
 
         mFuture = QtConcurrent::run([this, dlg]() {

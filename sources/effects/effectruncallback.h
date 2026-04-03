@@ -7,8 +7,8 @@ class EffectRunCallback : public QObject
     Q_OBJECT
 
 public:
-    bool isInterrupted() { return mIsInterrupted;  }
-    void interrupt() { mIsInterrupted = true; }
+    bool isInterrupted() noexcept { return mIsInterrupted.load(); }
+    void interrupt() noexcept { mIsInterrupted.store(true); }
 
 signals:
     void sendImage(const QImage& img);
