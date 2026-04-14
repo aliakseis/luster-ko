@@ -168,7 +168,8 @@ ScriptEffectSettings::ScriptEffectSettings(const FunctionInfo& functionInfo, QVa
     setLayout(formLayout);
 
     // Apply initial values from effectSettings to the controls.
-    if (mDataExchange.size() == effectSettings.size()) {
+    //if (mDataExchange.size() == effectSettings.size()) 
+    {
         auto it = mDataExchange.begin();
         auto effectIt = effectSettings.begin();
         while (it != mDataExchange.end() && effectIt != effectSettings.end()) {
