@@ -36,7 +36,11 @@
 ToolBar::ToolBar(const QMap<InstrumentsEnum, QAction *> &actMap, QWidget *parent) :
     QToolBar(tr("Instruments"), parent), mActMap(actMap)
 {
-    setMovable(false);
+    // enable docking
+    setMovable(true);
+    setFloatable(true);
+    setAllowedAreas(Qt::LeftToolBarArea | Qt::RightToolBarArea);
+
     initializeItems();
     mPrevInstrumentSet = false;
 }
@@ -101,18 +105,22 @@ void ToolBar::initializeItems()
     penSizeSpin->setToolTip(tr("Pen size"));
     connect(penSizeSpin, SIGNAL(valueChanged(int)), this, SLOT(penValueChanged(int)));
 
-    QGridLayout *tLayout = new QGridLayout();
-    tLayout->setContentsMargins(3, 3, 3, 3);
-    tLayout->addWidget(mPColorChooser, 0, 0);
-    tLayout->addWidget(mSColorChooser, 0, 1);
-    tLayout->addWidget(penSizeSpin, 1, 0, 1, 2);
+    //QGridLayout *tLayout = new QGridLayout();
+    //tLayout->setContentsMargins(3, 3, 3, 3);
+    //tLayout->addWidget(mPColorChooser, 0, 0);
+    //tLayout->addWidget(mSColorChooser, 0, 1);
+    //tLayout->addWidget(penSizeSpin, 1, 0, 1, 2);
 
-    QWidget *tWidget = new QWidget();
-    tWidget->setLayout(tLayout);
+    bLayout->addWidget(mPColorChooser, 6, 0);
+    bLayout->addWidget(mSColorChooser, 6, 1);
+    bLayout->addWidget(penSizeSpin, 7, 0, 1, 2);
+
+    //QWidget *tWidget = new QWidget();
+    //tWidget->setLayout(tLayout);
 
     addWidget(bWidget);
-    addSeparator();
-    addWidget(tWidget);
+    //addSeparator();
+    //addWidget(tWidget);
 }
 
 void ToolBar::penValueChanged(const int &value)

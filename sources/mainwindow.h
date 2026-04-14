@@ -65,7 +65,7 @@ public:
     ImageArea* initializeNewTab(bool openFile = false, bool askCanvasSize = false, const QString& filePath = {});
 
 protected:
-    void closeEvent(QCloseEvent *event);
+    void closeEvent(QCloseEvent *event) override;
 
 private:
     void initializeMainMenu();

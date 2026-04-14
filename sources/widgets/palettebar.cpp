@@ -24,12 +24,15 @@
  */
 
 #include "palettebar.h"
-#include "../datasingleton.h"
 
 PaletteBar::PaletteBar() :
     QToolBar(tr("Colors"))
 {
-    setMovable(false);
+    // enable docking
+    setMovable(true);
+    setFloatable(true);
+    setAllowedAreas(Qt::AllToolBarAreas);
+
     initializeItems();
 }
 
