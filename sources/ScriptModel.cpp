@@ -400,7 +400,7 @@ void ScriptModelImpl::loadScript(const QString& path)
         py::module_ sys = py::module_::import("sys");
 
         py::list sysPath = sys.attr("path");
-        qDebug() << "Python sys.path:" << QString::fromStdString(py::str(sysPath).cast<std::string>());
+        //qDebug() << "Python sys.path:" << QString::fromStdString(py::str(sysPath).cast<std::string>());
         for (py::handle path_item : sysPath) {
             std::string pathStr = py::str(path_item).cast<std::string>();
             QString qpath = QString::fromStdString(pathStr) + "/site-packages";
