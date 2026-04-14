@@ -72,8 +72,7 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
     mUndoStackGroup = new QUndoGroup(this);
 
     initializeMainMenu();
-    initializeToolBar();
-    initializePaletteBar();
+    initializeToolBars();
     initializeStatusBar();
     initializeTabWidget();
 
@@ -428,18 +427,18 @@ void MainWindow::initializeStatusBar()
     mStatusBar->addPermanentWidget(mColorRGBLabel, -1);
 }
 
-void MainWindow::initializeToolBar()
+void MainWindow::initializeToolBars()
 {
     mToolbar = new ToolBar(mInstrumentsActMap, this);
     addToolBar(Qt::LeftToolBarArea, mToolbar);
     connect(mToolbar, SIGNAL(sendClearStatusBarColor()), this, SLOT(clearStatusBarColor()));
     connect(mToolbar, SIGNAL(sendClearImageSelection()), this, SLOT(clearImageSelection()));
-}
 
-void MainWindow::initializePaletteBar()
-{
-    mPaletteBar = new PaletteBar(mToolbar);
+    mPaletteBar = new PaletteBar();
     addToolBar(Qt::BottomToolBarArea, mPaletteBar);
+
+    connect(mPaletteBar, &PaletteBar::colorClicked, mToolbar, &ToolBar::setPrimaryColorView);
+    connect(mPaletteBar, &PaletteBar::colorClicked, mToolbar, &ToolBar::setSecondaryColorView);
 }
 
 ImageArea* MainWindow::getCurrentImageArea()

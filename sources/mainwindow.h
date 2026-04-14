@@ -70,8 +70,7 @@ protected:
 private:
     void initializeMainMenu();
     void initializeStatusBar();
-    void initializeToolBar();
-    void initializePaletteBar();
+    void initializeToolBars();
     void initializeTabWidget();
     /**
      * @brief Get current ImageArea from current tab.

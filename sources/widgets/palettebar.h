@@ -40,7 +40,7 @@ class PaletteBar : public QToolBar
     Q_OBJECT
 
 public:
-    PaletteBar(ToolBar *toolBar);
+    PaletteBar();
 
 private:
     /**
@@ -57,10 +57,9 @@ private:
      */
 
     PaletteButton *mColorButton;
-    ToolBar *mToolBar;
     bool mIsRightButtonCLicked;
 
-private slots:
+signals:
     void colorClicked();
 
 protected:
