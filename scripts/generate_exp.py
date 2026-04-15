@@ -78,72 +78,115 @@ dlogging.set_verbosity_info()
 # Prompt weighting helpers (unchanged)
 # ------------------------------------------------------------------------------
 
-def _replace_innermost(text: str, open_ch: str, close_ch: str, weight: float):
-    pattern = re.compile(rf"\{open_ch}([^\\{open_ch}\{close_ch}]*)\{close_ch}")
-    m = pattern.search(text)
-    if not m:
-        return text, False
-    inner = m.group(1).strip()
-    if re.search(r":\s*[-+]?[0-9]*\.?[0-9]+$", inner):
-        new_group = f"{open_ch}{inner}{close_ch}"
-    else:
-        new_group = f"({inner}:{weight:.6g})"
-    new_text = text[:m.start()] + new_group + text[m.end():]
-    return new_text, True
+class PromptTrace:
+    def __init__(self):
+        self.errors = []
+        self.warnings = []
+
+    def error(self, msg, pos=None):
+        self.errors.append((msg, pos))
+
+    def warn(self, msg, pos=None):
+        self.warnings.append((msg, pos))
+
+    def has_issues(self):
+        return bool(self.errors or self.warnings)
 
 
-def _prompt_to_weighted_subprompts(prompt: str, base_emph: float = 1.1):
+def _snippet(text, pos, radius=30):
+    if pos is None:
+        return text
+    start = max(0, pos - radius)
+    end = min(len(text), pos + radius)
+    return text[start:end].replace("\n", " ")
+
+def _prompt_to_weighted_subprompts(prompt: str, base_emph: float = 1.1, trace=None):
     txt = prompt
     parts = []
-    stack = [1.0]
+
+    # stack holds (weight, position)
+    stack = [(1.0, None)]
+
     cur = []
     i = 0
     emph = base_emph
     deemph = 1.0 / base_emph
 
+    if trace is None:
+        trace = PromptTrace()
+
     while i < len(txt):
         ch = txt[i]
+
         if ch == "(":
             if cur:
-                parts.append(("".join(cur).strip(), stack[-1]))
+                parts.append(("".join(cur).strip(), stack[-1][0]))
                 cur = []
-            stack.append(stack[-1] * emph)
+            stack.append((stack[-1][0] * emph, i))
             i += 1
+
         elif ch == "[":
             if cur:
-                parts.append(("".join(cur).strip(), stack[-1]))
+                parts.append(("".join(cur).strip(), stack[-1][0]))
                 cur = []
-            stack.append(stack[-1] * deemph)
+            stack.append((stack[-1][0] * deemph, i))
             i += 1
+
         elif ch == ")" or ch == "]":
             if cur:
-                parts.append(("".join(cur).strip(), stack[-1]))
+                parts.append(("".join(cur).strip(), stack[-1][0]))
                 cur = []
             if len(stack) > 1:
                 stack.pop()
+            else:
+                trace.error(f"Unmatched closing '{ch}'", i)
             i += 1
+
         else:
             cur.append(ch)
             i += 1
 
     if cur:
-        parts.append(("".join(cur).strip(), stack[-1]))
+        parts.append(("".join(cur).strip(), stack[-1][0]))
+
+    # unclosed brackets
+    if len(stack) > 1:
+        for _, pos in stack[1:]:
+            trace.error("Unclosed bracket", pos)
 
     final = []
+
     for text_part, w in parts:
         if not text_part:
+            trace.warn("Empty group detected")
             continue
+
+        # detect repeated separators
+        if re.search(r"[,\|]\s*[,\|]", text_part):
+            trace.warn(f"Repeated separators in '{text_part}'")
+
         for chunk in re.split(r"\s*\|\s*|\s*,\s*", text_part):
             s = chunk.strip()
             if not s:
+                #trace.warn("Empty fragment after split")
                 continue
-            m = re.match(r"^(.*?):\s*([-+]?[0-9]*\.?[0-9]+)\s*$", s)
+
+            # detect weight syntax
+            m = re.match(r"^(.*?):\s*(.+)$", s)
             if m:
-                final.append((m.group(1).strip(), float(m.group(2)) * w))
+                label = m.group(1).strip()
+                weight_str = m.group(2).strip()
+
+                try:
+                    val = float(weight_str)
+                    final.append((label, val * w))
+                except ValueError:
+                    trace.error(f"Invalid weight '{weight_str}' in '{s}'")
+                    final.append((label, w))  # fallback (unchanged behavior)
             else:
                 final.append((s, w))
-    return final
 
+    return final, trace
 
 def _encode_subprompts_to_embeds(subprompts, tokenizer, text_encoder, device, max_length):
     device = torch.device(device)
@@ -199,16 +242,33 @@ def _build_prompt_embeds(pipe, prompt, negative_prompt="", base_emph=1.1):
     text_encoder = pipe.text_encoder
     max_length = tokenizer.model_max_length
 
-    conditional_subs = _prompt_to_weighted_subprompts(prompt, base_emph=base_emph)
+    conditional_subs, trace = _prompt_to_weighted_subprompts(prompt, base_emph=base_emph)
     cond_embeds, cond_mask = _encode_subprompts_to_embeds(
         conditional_subs, tokenizer, text_encoder, pipe.device, max_length
     )
 
+    if trace.errors:
+        for msg, pos in trace.errors:
+            logger.error(f"[PROMPT ERROR] {msg} at {pos}: ...{_snippet(prompt, pos)}...")
+
+    if trace.warnings:
+        for msg, pos in trace.warnings:
+            logger.warning(f"[PROMPT WARNING] {msg} at {pos}: ...{_snippet(prompt, pos)}...")
+
     if negative_prompt and negative_prompt.strip():
-        negative_subs = _prompt_to_weighted_subprompts(negative_prompt, base_emph=base_emph)
+        negative_subs, neg_trace = _prompt_to_weighted_subprompts(negative_prompt, base_emph=base_emph)
         neg_embeds, neg_mask = _encode_subprompts_to_embeds(
             negative_subs, tokenizer, text_encoder, pipe.device, max_length
         )
+
+        if neg_trace.errors:
+            for msg, pos in neg_trace.errors:
+                logger.error(f"[NEG PROMPT ERROR] {msg} at {pos}: ...{_snippet(negative_prompt, pos)}...")
+
+        if neg_trace.warnings:
+            for msg, pos in neg_trace.warnings:
+                logger.warning(f"[NEG PROMPT WARNING] {msg} at {pos}: ...{_snippet(negative_prompt, pos)}...")
+
     else:
         inputs = tokenizer("", padding="max_length", truncation=True, max_length=max_length, return_tensors="pt")
         input_ids = inputs.input_ids.to(pipe.device)
