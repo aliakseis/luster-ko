@@ -82,9 +82,9 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
     }
     else
     {
-        for(int i(0); i < filePaths.size(); i++)
+        for(const auto& path : filePaths)
         {
-            initializeNewTab(true, false, filePaths.at(i));
+            initializeNewTab(true, false, path);
         }
     }
     qRegisterMetaType<InstrumentsEnum>("InstrumentsEnum");
