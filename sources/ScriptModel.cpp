@@ -6,6 +6,8 @@
 #include "effects/scripteffect.h"
 #include "effects/scripteffectwithsettings.h"
 
+#include "PythonConsoleRedirector.h"
+
 #include <QFileInfo>
 #include <QDir>
 #include <QRegularExpression>
@@ -303,7 +305,7 @@ public:
     void shutdown();   // clean shutdown; will stop interpreter and release resources
 
     // operations (all run inside impl thread)
-    void loadScript(const QString& path);
+    void loadScript(ScriptModel* model, const QString& path);
     std::vector<FunctionInfo> getFunctionInfos(); // copy out function list (safe across threads)
     QVariant callFunction(const QString& callable, const QVariantList& args,
         std::weak_ptr<EffectRunCallback> callback,
@@ -388,7 +390,7 @@ void ScriptModelImpl::shutdown()
     mFunctionInfos.clear();
 }
 
-void ScriptModelImpl::loadScript(const QString& path)
+void ScriptModelImpl::loadScript(ScriptModel* model, const QString& path)
 {
     if (!mValid)
         return;
@@ -421,6 +423,42 @@ void ScriptModelImpl::loadScript(const QString& path)
 
         py::module_ mainModule = py::module_::import("__main__");
         py::dict globals = mainModule.attr("__dict__");
+
+        static PythonFdRedirector* fdRedirector = nullptr;
+        if (!fdRedirector)
+            fdRedirector = new PythonFdRedirector(this);
+
+        static bool streamClassCreated = false;
+        if (!streamClassCreated) {
+            py::class_<PythonQtStream>(mainModule, "QtStream")
+                .def(py::init<>())
+                .def("write", &PythonQtStream::write)
+                .def("flush", &PythonQtStream::flush);
+            streamClassCreated = true;
+        }
+
+        py::object qtOut = globals["QtStream"]();
+        py::object qtErr = globals["QtStream"]();
+
+        sys.attr("stdout") = qtOut;
+        sys.attr("stderr") = qtErr;
+
+        // Sink -> Qt widget
+        PythonQtStream::sink = [model](const std::string& s) {
+            emit model->appendPythonOutput(QString::fromUtf8(s.c_str()));
+            };
+
+
+        // Override shutil.get_terminal_size for tqdm
+        py::module_ shutil = py::module_::import("shutil");
+        py::module_ os = py::module_::import("os");
+        py::object terminal_size = os.attr("terminal_size");
+
+        shutil.attr("get_terminal_size") = py::cpp_function([terminal_size]() {
+            int cols = get_console_width_chars();
+            int rows = 24;
+            return terminal_size(py::make_tuple(cols, rows));
+            });
 
         globals["_send_image"] = py::cpp_function([this](const py::array& image) {
             // send_image must emit in main thread (showing images via callback)
@@ -665,7 +703,7 @@ void ScriptModel::LoadScript(const QString& path)
     if (!mImpl) return;
     // forward to impl (blocking)
     QMetaObject::invokeMethod(mImpl.get(),
-        [this, path]() { mImpl->loadScript(path); },
+        [this, path]() { mImpl->loadScript(this, path); },
         Qt::BlockingQueuedConnection);
 }
 

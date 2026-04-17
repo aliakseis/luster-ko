@@ -53,9 +53,10 @@ set (HEADERS
     sources/qtsingleapplication/qtlocalpeer.h
     sources/qtsingleapplication/qtsingleapplication.h
     sources/qtsingleapplication/qtsinglecoreapplication.h
-    sources/set_dark_theme.h
+    sources/PythonConsoleRedirector.h
     sources/ScriptInfo.h
     sources/ScriptModel.h
+    sources/set_dark_theme.h
     sources/undocommand.h
     sources/widgets/toolbar.h
     sources/widgets/colorchooser.h
@@ -66,6 +67,7 @@ set (HEADERS
     sources/widgets/customfiltersettings.h
     sources/widgets/sharpenfiltersettings.h
     sources/widgets/gaussianblurfiltersettings.h
+    sources/widgets/PythonConsoleWidget.h
     sources/widgets/scripteffectsettings.h
     sources/dialogs/resizedialog.h
     sources/dialogs/settingsdialog.h
@@ -106,8 +108,8 @@ set (SOURCES
     sources/qtsingleapplication/qtlocalpeer.cpp
     sources/qtsingleapplication/qtsingleapplication.cpp
     sources/qtsingleapplication/qtsinglecoreapplication.cpp
-    sources/set_dark_theme.cpp
     sources/ScriptModel.cpp
+    sources/set_dark_theme.cpp
     sources/undocommand.cpp
     sources/widgets/toolbar.cpp
     sources/widgets/colorchooser.cpp
@@ -117,6 +119,7 @@ set (SOURCES
     sources/widgets/customfiltersettings.cpp
     sources/widgets/sharpenfiltersettings.cpp
     sources/widgets/gaussianblurfiltersettings.cpp
+    sources/widgets/PythonConsoleWidget.cpp
     sources/widgets/scripteffectsettings.cpp
     sources/dialogs/resizedialog.cpp
     sources/dialogs/settingsdialog.cpp
