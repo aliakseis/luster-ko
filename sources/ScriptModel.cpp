@@ -425,9 +425,9 @@ void ScriptModelImpl::loadScript(ScriptModel* model, const QString& path)
         py::module_ mainModule = py::module_::import("__main__");
         py::dict globals = mainModule.attr("__dict__");
 
-        static PythonFdRedirector* fdRedirector = nullptr;
-        if (!fdRedirector)
-            fdRedirector = new PythonFdRedirector(this);
+        //static PythonFdRedirector* fdRedirector = nullptr;
+        //if (!fdRedirector)
+        //    fdRedirector = new PythonFdRedirector(this);
 
         py::class_<PythonQtStream>(mainModule, "QtStream")
             .def(py::init<>())
