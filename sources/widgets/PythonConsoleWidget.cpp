@@ -1,9 +1,8 @@
 #include "PythonConsoleWidget.h"
 #include <QFontDatabase>
 #include <QTextCursor>
-#include "../PythonConsoleRedirector.h"
+//#include "../PythonConsoleRedirector.h"
 
-PythonConsoleWidget* g_consoleWidget = nullptr;
 
 PythonConsoleWidget::PythonConsoleWidget(QWidget* parent)
     : QPlainTextEdit(parent)
@@ -15,13 +14,6 @@ PythonConsoleWidget::PythonConsoleWidget(QWidget* parent)
     f.setStyleHint(QFont::Monospace);
     f.setFixedPitch(true);
     setFont(f);
-
-    g_consoleWidget = this;
-}
-
-PythonConsoleWidget::~PythonConsoleWidget()
-{
-    g_consoleWidget = nullptr;
 }
 
 void PythonConsoleWidget::appendPythonOutput(const QString& text)
@@ -96,6 +88,6 @@ void PythonConsoleWidget::appendPythonOutput(const QString& text)
 void PythonConsoleWidget::resizeEvent(QResizeEvent* e)
 {
     QPlainTextEdit::resizeEvent(e);
-    if (PythonQtStream::sink)
-        PythonQtStream::sink("\r");
+    //if (PythonQtStream::sink)
+    //    PythonQtStream::sink("\r");
 }

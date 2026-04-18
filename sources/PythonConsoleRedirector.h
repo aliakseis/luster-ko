@@ -26,8 +26,14 @@
 // 1) Python-level stream
 struct PythonQtStream {
     static std::function<void(const std::string&)> sink;
-    void write(const std::string& s) { if (sink) sink(s); }
+    int write(const std::string& s) {
+        if (sink) sink(s);
+        return (int)s.size();
+    }
     void flush() {}
+    bool isatty() const { return true; }
+    int fileno() const { return -1; }  // the stream as a nonfile object
+    std::string encoding() const { return "utf-8"; }
 };
 inline std::function<void(const std::string&)> PythonQtStream::sink;
 
@@ -76,14 +82,14 @@ private:
 };
 
 // 3) tqdm width helper
-inline int get_console_width_chars()
-{
-    if (!g_consoleWidget)
-        return 80;
-
-    int px = g_consoleWidget->viewport()->width();
-    int charWidth = g_consoleWidget->fontMetrics().horizontalAdvance('M');
-    if (charWidth <= 0) charWidth = 8;
-
-    return std::max(20, px / charWidth);
-}
+//inline int get_console_width_chars()
+//{
+//    if (!g_consoleWidget)
+//        return 80;
+//
+//    int px = g_consoleWidget->viewport()->width();
+//    int charWidth = g_consoleWidget->fontMetrics().horizontalAdvance('M');
+//    if (charWidth <= 0) charWidth = 8;
+//
+//    return std::max(80, px / charWidth);
+//}

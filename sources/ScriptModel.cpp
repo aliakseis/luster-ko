@@ -327,6 +327,7 @@ private:
         PythonScope() {}
     };
     std::unique_ptr<PythonScope> mPythonScope;
+    int m_console_width_chars = 80; // default width for terminal emulation (tqdm, etc.)
 };
 
 // Implementation ----------------------------------------------------------
@@ -428,14 +429,13 @@ void ScriptModelImpl::loadScript(ScriptModel* model, const QString& path)
         if (!fdRedirector)
             fdRedirector = new PythonFdRedirector(this);
 
-        static bool streamClassCreated = false;
-        if (!streamClassCreated) {
-            py::class_<PythonQtStream>(mainModule, "QtStream")
-                .def(py::init<>())
-                .def("write", &PythonQtStream::write)
-                .def("flush", &PythonQtStream::flush);
-            streamClassCreated = true;
-        }
+        py::class_<PythonQtStream>(mainModule, "QtStream")
+            .def(py::init<>())
+            .def("write", &PythonQtStream::write)
+            .def("flush", &PythonQtStream::flush)
+            .def("isatty", &PythonQtStream::isatty)
+            .def("fileno", &PythonQtStream::fileno)
+            .def_property_readonly("encoding", &PythonQtStream::encoding);
 
         py::object qtOut = globals["QtStream"]();
         py::object qtErr = globals["QtStream"]();
@@ -449,15 +449,36 @@ void ScriptModelImpl::loadScript(ScriptModel* model, const QString& path)
             };
 
 
-        // Override shutil.get_terminal_size for tqdm
+        // Override terminal size for tqdm and others
         py::module_ shutil = py::module_::import("shutil");
         py::module_ os = py::module_::import("os");
+
+        // Named tuple type
         py::object terminal_size = os.attr("terminal_size");
 
-        shutil.attr("get_terminal_size") = py::cpp_function([terminal_size]() {
-            int cols = get_console_width_chars();
-            int rows = 24;
-            return terminal_size(py::make_tuple(cols, rows));
+        // Our implementation
+        auto get_size = py::cpp_function(
+            [this, terminal_size](py::args args, py::kwargs kwargs) {
+                int cols = m_console_width_chars;
+                int rows = 24;
+
+                if (cols < 80) cols = 80;
+
+                return terminal_size(py::make_tuple(cols, rows));
+            }
+        );
+
+        // Override BOTH
+        shutil.attr("get_terminal_size") = get_size;
+        os.attr("get_terminal_size") = get_size;
+
+        // Also set environment variables
+        //py::object os_environ = os.attr("environ");
+        //os_environ["COLUMNS"] = py::str("80");
+        //os_environ["LINES"] = py::str("24");
+
+        os.attr("isatty") = py::cpp_function([](int fd) {
+            return true;
             });
 
         globals["_send_image"] = py::cpp_function([this](const py::array& image) {
