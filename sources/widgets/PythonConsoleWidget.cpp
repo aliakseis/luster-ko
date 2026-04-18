@@ -19,19 +19,64 @@ PythonConsoleWidget::PythonConsoleWidget(QWidget* parent)
     g_consoleWidget = this;
 }
 
+PythonConsoleWidget::~PythonConsoleWidget()
+{
+    g_consoleWidget = nullptr;
+}
+
 void PythonConsoleWidget::appendPythonOutput(const QString& text)
 {
     QTextCursor cursor = this->textCursor();
     cursor.movePosition(QTextCursor::End);
 
-    const auto parts = text.split('\r');
-    for (int i = 0; i < parts.size(); ++i) {
-        if (i > 0) {
+    QString buffer = text;
+
+    while (!buffer.isEmpty()) {
+        int rPos = buffer.indexOf('\r');
+        int nPos = buffer.indexOf('\n');
+
+        //cursor.movePosition(QTextCursor::End);
+
+        if (m_insertBlock) {
+            cursor.insertBlock();
+            m_insertBlock = false;
+        }
+
+        // Case 1: newline first
+        if (nPos != -1 && (rPos == -1 || nPos < rPos)) {
+            QString chunk = buffer.left(nPos);
+            cursor.insertText(chunk);
+            m_insertBlock = true;
+            buffer.remove(0, nPos + 1);
+            continue;
+        }
+
+        // Case 2: carriage return first
+        if (rPos != -1) {
+            // Check for \r\n (Windows newline)
+            if (rPos + 1 < buffer.size() && buffer[rPos + 1] == '\n') {
+                QString chunk = buffer.left(rPos);
+                cursor.insertText(chunk);
+                m_insertBlock = true;
+                buffer.remove(0, rPos + 2);
+                continue;
+            }
+
+            // Bare \r -> overwrite current line (tqdm)
+            QString chunk = buffer.left(rPos);
+
             cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::KeepAnchor);
             cursor.removeSelectedText();
             cursor.deletePreviousChar();
+
+            cursor.insertText(chunk);
+            buffer.remove(0, rPos + 1);
+            continue;
         }
-        cursor.insertText(parts[i]);
+
+        // Case 3: no control characters left
+        cursor.insertText(buffer);
+        break;
     }
 
     this->setTextCursor(cursor);
