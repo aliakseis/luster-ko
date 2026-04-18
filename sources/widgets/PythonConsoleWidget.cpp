@@ -32,51 +32,62 @@ void PythonConsoleWidget::appendPythonOutput(const QString& text)
     QString buffer = text;
 
     while (!buffer.isEmpty()) {
+
         int rPos = buffer.indexOf('\r');
         int nPos = buffer.indexOf('\n');
 
-        //cursor.movePosition(QTextCursor::End);
+        // Determine which control char comes first
+        int pos = -1;
+        QChar ctrl;
 
-        if (m_insertBlock) {
-            cursor.insertBlock();
-            m_insertBlock = false;
+        if (rPos == -1 && nPos == -1) {
+            ctrl = QChar();
+        }
+        else if (rPos == -1 || (nPos != -1 && nPos < rPos)) {
+            pos = nPos;
+            ctrl = '\n';
+        }
+        else {
+            pos = rPos;
+            ctrl = '\r';
         }
 
-        // Case 1: newline first
-        if (nPos != -1 && (rPos == -1 || nPos < rPos)) {
-            QString chunk = buffer.left(nPos);
+        // No control characters left
+        if (pos == -1) {
+            cursor.insertText(buffer);
+            break;
+        }
+
+        // Extract chunk before control char
+        QString chunk = buffer.left(pos);
+
+        if (!chunk.isEmpty()) {
             cursor.insertText(chunk);
-            m_insertBlock = true;
-            buffer.remove(0, nPos + 1);
+        }
+
+        // Handle control character
+        if (ctrl == '\n') {
+            cursor.insertBlock();
+            buffer.remove(0, pos + 1);
             continue;
         }
 
-        // Case 2: carriage return first
-        if (rPos != -1) {
-            // Check for \r\n (Windows newline)
-            if (rPos + 1 < buffer.size() && buffer[rPos + 1] == '\n') {
-                QString chunk = buffer.left(rPos);
-                cursor.insertText(chunk);
-                m_insertBlock = true;
-                buffer.remove(0, rPos + 2);
+        if (ctrl == '\r') {
+            // Handle Windows \r\n as newline
+            if (pos + 1 < buffer.size() && buffer[pos + 1] == '\n') {
+                cursor.insertBlock();
+                buffer.remove(0, pos + 2);
                 continue;
             }
 
-            // Bare \r -> overwrite current line (tqdm)
-            QString chunk = buffer.left(rPos);
-
-            cursor.movePosition(QTextCursor::StartOfLine, QTextCursor::KeepAnchor);
+            // Proper carriage return behavior (overwrite line)
+            cursor.movePosition(QTextCursor::StartOfLine);
+            cursor.select(QTextCursor::LineUnderCursor);
             cursor.removeSelectedText();
-            cursor.deletePreviousChar();
 
-            cursor.insertText(chunk);
-            buffer.remove(0, rPos + 1);
+            buffer.remove(0, pos + 1);
             continue;
         }
-
-        // Case 3: no control characters left
-        cursor.insertText(buffer);
-        break;
     }
 
     this->setTextCursor(cursor);

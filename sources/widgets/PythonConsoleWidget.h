@@ -5,6 +5,7 @@ class PythonConsoleWidget : public QPlainTextEdit {
     Q_OBJECT
 public:
     explicit PythonConsoleWidget(QWidget* parent = nullptr);
+    ~PythonConsoleWidget();
 
 public slots:
     void appendPythonOutput(const QString& text);
