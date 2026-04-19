@@ -53,7 +53,6 @@ set (HEADERS
     sources/qtsingleapplication/qtlocalpeer.h
     sources/qtsingleapplication/qtsingleapplication.h
     sources/qtsingleapplication/qtsinglecoreapplication.h
-    sources/PythonConsoleRedirector.h
     sources/ScriptInfo.h
     sources/ScriptModel.h
     sources/set_dark_theme.h
@@ -202,6 +201,23 @@ add_executable(${PROJECT}
     ${QRC_SOURCES}
     ${TRANSLATIONS_QM}
 )
+
+# --- Platform-specific tweaks ---
+if(WIN32)
+    # On Windows, use the GUI subsystem (no console window)
+    set_target_properties(${PROJECT} PROPERTIES
+        WIN32_EXECUTABLE TRUE
+    )
+elseif(APPLE)
+    # On macOS, mark as a bundle (no terminal window when launched from Finder)
+    set_target_properties(${PROJECT} PROPERTIES
+        MACOSX_BUNDLE TRUE
+    )
+else()
+    # On Linux/Unix, there is no subsystem flag.
+    # To avoid a terminal, launch from a desktop entry or with nohup/setsid.
+    # Nothing special needed in CMake.
+endif()
 
 target_link_libraries(${PROJECT}
     Qt${QT_VERSION_MAJOR}::Widgets

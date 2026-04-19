@@ -6,8 +6,6 @@
 #include "effects/scripteffect.h"
 #include "effects/scripteffectwithsettings.h"
 
-#include "PythonConsoleRedirector.h"
-
 #include <QFileInfo>
 #include <QDir>
 #include <QRegularExpression>
@@ -291,6 +289,20 @@ namespace {
         return { description, params };
     }
 
+    // Python-level stream
+    struct PythonQtStream {
+        static std::function<void(const std::string&)> sink;
+        int write(const std::string& s) {
+            if (sink) sink(s);
+            return (int)s.size();
+        }
+        void flush() {}
+        bool isatty() const { return true; }
+        int fileno() const { return -1; }  // the stream as a nonfile object
+        std::string encoding() const { return "utf-8"; }
+    };
+    inline std::function<void(const std::string&)> PythonQtStream::sink;
+
 } // anonymous namespace
 
 // Forward declare ScriptModelImpl
@@ -425,10 +437,6 @@ void ScriptModelImpl::loadScript(ScriptModel* model, const QString& path)
         py::module_ mainModule = py::module_::import("__main__");
         py::dict globals = mainModule.attr("__dict__");
 
-        //static PythonFdRedirector* fdRedirector = nullptr;
-        //if (!fdRedirector)
-        //    fdRedirector = new PythonFdRedirector(this);
-
         py::class_<PythonQtStream>(mainModule, "QtStream")
             .def(py::init<>())
             .def("write", &PythonQtStream::write)
@@ -459,6 +467,8 @@ void ScriptModelImpl::loadScript(ScriptModel* model, const QString& path)
         // Our implementation
         auto get_size = py::cpp_function(
             [this, terminal_size](py::args args, py::kwargs kwargs) {
+                qDebug() << "get_terminal_size called with args:" << QString::fromStdString(py::str(args).cast<std::string>())
+                    << "kwargs:" << QString::fromStdString(py::str(kwargs).cast<std::string>());
                 int cols = m_console_width_chars;
                 int rows = 24;
 
