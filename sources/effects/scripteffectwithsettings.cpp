@@ -1,6 +1,7 @@
 #include "scripteffectwithsettings.h"
 
 #include "../widgets/scripteffectsettings.h"
+#include "../widgets/PythonConsoleWidget.h"
 
 #include "../ScriptModel.h"
 
@@ -17,6 +18,13 @@ AbstractEffectSettings* ScriptEffectWithSettings::getSettingsWidget()
 {
     auto effectSettings = QSettings().value(PREFIX + mFunctionInfo.name).toList();
     return new ScriptEffectSettings(mFunctionInfo, effectSettings);
+}
+
+QWidget* ScriptEffectWithSettings::getConsoleWidget()
+{
+    auto res = new PythonConsoleWidget();
+    connect(mScriptModel, &ScriptModel::appendPythonOutput, res, &PythonConsoleWidget::appendPythonOutput);
+    return res;
 }
 
 void ScriptEffectWithSettings::convertImage(const QImage* source, const QImage* markup, QImage& image, const QVariantList& matrix, std::weak_ptr<EffectRunCallback> callback)

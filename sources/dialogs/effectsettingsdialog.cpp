@@ -199,11 +199,24 @@ EffectSettingsDialog::EffectSettingsDialog(const QImage* img, const QImage* mark
     hLayout_1->addWidget(mSettingsWidget);
 
     QHBoxLayout *hLayout_2 = new QHBoxLayout();
+    QBoxLayout* btnLayout;
 
-    hLayout_2->addWidget(mOkButton);
-    hLayout_2->addWidget(mCancelButton);
-    hLayout_2->addWidget(mApplyButton);
-    hLayout_2->addWidget(mInterruptButton);
+    if (auto consoleWidget = effectWithSettings->getConsoleWidget())
+    {
+        btnLayout = new QVBoxLayout();
+        // Give the console widget more space
+        hLayout_2->addWidget(consoleWidget, 3);
+        hLayout_2->addLayout(btnLayout);
+    }
+    else
+    {
+        btnLayout = hLayout_2;
+    }
+
+    btnLayout->addWidget(mOkButton);
+    btnLayout->addWidget(mCancelButton);
+    btnLayout->addWidget(mApplyButton);
+    btnLayout->addWidget(mInterruptButton);
 
     QVBoxLayout *vLayout = new QVBoxLayout();
 

@@ -33,6 +33,9 @@ public:
 
     static int ValidatePythonSystem();
 
+Q_SIGNALS:
+    void appendPythonOutput(const QString& output);
+
 private:
     // PImpl running in its own thread
     std::unique_ptr<ScriptModelImpl> mImpl;

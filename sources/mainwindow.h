@@ -116,6 +116,9 @@ private:
 
     ScriptModel* mScriptModel = nullptr;
 
+    QString m_lastLine;
+    QString m_lastNonEmptyLine;
+
 private slots:
     void activateTab(const int &index);
     void setNewSizeToSizeLabel(const QSize &size);
@@ -159,6 +162,8 @@ private slots:
     void restorePreviousInstrument();
     void setInstrument(InstrumentsEnum instrument);
     void openRecentFile();
+
+    void processConsoleText(const QString& text);
 signals:
     void sendInstrumentChecked(InstrumentsEnum);
 

@@ -16,5 +16,6 @@ private:
 
     // Inherited via EffectWithSettings
     AbstractEffectSettings* getSettingsWidget() override;
+    QWidget* getConsoleWidget() override;
     void convertImage(const QImage* source, const QImage* markup, QImage& image, const QVariantList& matrix, std::weak_ptr<EffectRunCallback> callback = {}) override;
 };

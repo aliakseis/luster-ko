@@ -53,9 +53,9 @@ set (HEADERS
     sources/qtsingleapplication/qtlocalpeer.h
     sources/qtsingleapplication/qtsingleapplication.h
     sources/qtsingleapplication/qtsinglecoreapplication.h
-    sources/set_dark_theme.h
     sources/ScriptInfo.h
     sources/ScriptModel.h
+    sources/set_dark_theme.h
     sources/undocommand.h
     sources/widgets/toolbar.h
     sources/widgets/colorchooser.h
@@ -66,6 +66,7 @@ set (HEADERS
     sources/widgets/customfiltersettings.h
     sources/widgets/sharpenfiltersettings.h
     sources/widgets/gaussianblurfiltersettings.h
+    sources/widgets/PythonConsoleWidget.h
     sources/widgets/scripteffectsettings.h
     sources/dialogs/resizedialog.h
     sources/dialogs/settingsdialog.h
@@ -106,8 +107,8 @@ set (SOURCES
     sources/qtsingleapplication/qtlocalpeer.cpp
     sources/qtsingleapplication/qtsingleapplication.cpp
     sources/qtsingleapplication/qtsinglecoreapplication.cpp
-    sources/set_dark_theme.cpp
     sources/ScriptModel.cpp
+    sources/set_dark_theme.cpp
     sources/undocommand.cpp
     sources/widgets/toolbar.cpp
     sources/widgets/colorchooser.cpp
@@ -117,6 +118,7 @@ set (SOURCES
     sources/widgets/customfiltersettings.cpp
     sources/widgets/sharpenfiltersettings.cpp
     sources/widgets/gaussianblurfiltersettings.cpp
+    sources/widgets/PythonConsoleWidget.cpp
     sources/widgets/scripteffectsettings.cpp
     sources/dialogs/resizedialog.cpp
     sources/dialogs/settingsdialog.cpp
@@ -199,6 +201,23 @@ add_executable(${PROJECT}
     ${QRC_SOURCES}
     ${TRANSLATIONS_QM}
 )
+
+# --- Platform-specific tweaks ---
+if(WIN32)
+    # On Windows, use the GUI subsystem (no console window)
+    set_target_properties(${PROJECT} PROPERTIES
+        WIN32_EXECUTABLE TRUE
+    )
+elseif(APPLE)
+    # On macOS, mark as a bundle (no terminal window when launched from Finder)
+    set_target_properties(${PROJECT} PROPERTIES
+        MACOSX_BUNDLE TRUE
+    )
+else()
+    # On Linux/Unix, there is no subsystem flag.
+    # To avoid a terminal, launch from a desktop entry or with nohup/setsid.
+    # Nothing special needed in CMake.
+endif()
 
 target_link_libraries(${PROJECT}
     Qt${QT_VERSION_MAJOR}::Widgets

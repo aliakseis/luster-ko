@@ -59,6 +59,20 @@ static QString strippedName(const QString& fullFileName)
     return QFileInfo(fullFileName).fileName();
 }
 
+static QString elideStatusText(const QString& text, int maxLen = 120)
+{
+    if (text.size() <= maxLen)
+        return text;
+
+    QString tail = text.right(maxLen - 3);
+
+    int spacePos = tail.indexOf(' ');
+    if (spacePos > 0 && spacePos < 20) // avoid ugly mid-word cut
+        tail = tail.mid(spacePos + 1);
+
+    return "..." + tail;
+}
+
 MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
     : QMainWindow(parent), mPrevInstrumentSet(false)
 {
@@ -91,13 +105,16 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
 
     if (DataSingleton::Instance()->getIsLoadScript())
     {
-        mStatusLabel->setText(tr("Loading script..."));
+        m_lastNonEmptyLine = tr("Loading script...");
+        mStatusLabel->setText(m_lastNonEmptyLine);
         mScriptModel = new ScriptModel(this, DataSingleton::Instance()->getVirtualEnvPath());
+        connect(mScriptModel, &ScriptModel::appendPythonOutput, this, &MainWindow::processConsoleText);
         auto future = QtConcurrent::run([this, path = DataSingleton::Instance()->getScriptPath()] {
             mScriptModel->LoadScript(path);
         });
         auto* watcher = new QFutureWatcher<void>(this);
         connect(watcher, &QFutureWatcher<void>::finished, this, [this] {
+            disconnect(mScriptModel, &ScriptModel::appendPythonOutput, this, &MainWindow::processConsoleText);
             mScriptModel->setupActions(mFileMenu, mEffectsMenu, mEffectsActMap);
             mStatusLabel->setText(tr("Ready"));
         });
@@ -107,7 +124,6 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
 
 MainWindow::~MainWindow()
 {
-    
 }
 
 void MainWindow::initializeTabWidget()
@@ -914,4 +930,80 @@ void MainWindow::openRecentFile()
 {
     if (auto action = qobject_cast<QAction*>(sender()))
         initializeNewTab(true, false, action->data().toString());
+}
+
+void MainWindow::processConsoleText(const QString& text)
+{
+    QString buffer = text;
+
+    while (!buffer.isEmpty()) {
+
+        int rPos = buffer.indexOf('\r');
+        int nPos = buffer.indexOf('\n');
+
+        int pos = -1;
+        QChar ctrl;
+
+        if (rPos == -1 && nPos == -1) {
+            ctrl = QChar();
+        }
+        else if (rPos == -1 || (nPos != -1 && nPos < rPos)) {
+            pos = nPos;
+            ctrl = '\n';
+        }
+        else {
+            pos = rPos;
+            ctrl = '\r';
+        }
+
+        // No control chars left
+        if (pos == -1) {
+            if (!buffer.isEmpty()) {
+                m_lastLine += buffer;
+
+                // update only if meaningful
+                if (!m_lastLine.trimmed().isEmpty())
+                    m_lastNonEmptyLine = m_lastLine;
+            }
+            break;
+        }
+
+        QString chunk = buffer.left(pos);
+
+        if (!chunk.isEmpty()) {
+            m_lastLine += chunk;
+
+            // update only if meaningful
+            if (!m_lastLine.trimmed().isEmpty())
+                m_lastNonEmptyLine = m_lastLine;
+        }
+
+        if (ctrl == '\n') {
+            m_lastLine.clear();
+            buffer.remove(0, pos + 1);
+            continue;
+        }
+
+        if (ctrl == '\r') {
+            // handle \r\n
+            if (pos + 1 < buffer.size() && buffer[pos + 1] == '\n') {
+                m_lastLine.clear();
+                buffer.remove(0, pos + 2);
+                continue;
+            }
+
+            // overwrite line
+            m_lastLine.clear();
+            buffer.remove(0, pos + 1);
+            continue;
+        }
+    }
+
+    // final display logic
+    const QString& toShow =
+        m_lastLine.trimmed().isEmpty()
+        ? m_lastNonEmptyLine
+        : m_lastLine;
+
+    mStatusLabel->setText(elideStatusText(toShow));
 }
