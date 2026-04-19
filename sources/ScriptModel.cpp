@@ -467,8 +467,6 @@ void ScriptModelImpl::loadScript(ScriptModel* model, const QString& path)
         // Our implementation
         auto get_size = py::cpp_function(
             [this, terminal_size](py::args args, py::kwargs kwargs) {
-                qDebug() << "get_terminal_size called with args:" << QString::fromStdString(py::str(args).cast<std::string>())
-                    << "kwargs:" << QString::fromStdString(py::str(kwargs).cast<std::string>());
                 int cols = m_console_width_chars;
                 int rows = 24;
 
