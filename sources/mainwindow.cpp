@@ -49,6 +49,7 @@
 #include <QSettings>
 #include <QFileInfo>
 #include <QtConcurrent>
+#include <QFontDatabase>
 
 #undef slots
 
@@ -105,6 +106,12 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
 
     if (DataSingleton::Instance()->getIsLoadScript())
     {
+        auto oldFont = mStatusLabel->font();
+        QFont f = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+        f.setStyleHint(QFont::Monospace);
+        f.setFixedPitch(true);
+        mStatusLabel->setFont(f);
+
         m_lastNonEmptyLine = tr("Loading script...");
         mStatusLabel->setText(m_lastNonEmptyLine);
         mScriptModel = new ScriptModel(this, DataSingleton::Instance()->getVirtualEnvPath());
@@ -113,9 +120,10 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
             mScriptModel->LoadScript(path);
         });
         auto* watcher = new QFutureWatcher<void>(this);
-        connect(watcher, &QFutureWatcher<void>::finished, this, [this] {
+        connect(watcher, &QFutureWatcher<void>::finished, this, [this, oldFont] {
             disconnect(mScriptModel, &ScriptModel::appendPythonOutput, this, &MainWindow::processConsoleText);
             mScriptModel->setupActions(mFileMenu, mEffectsMenu, mEffectsActMap);
+            mStatusLabel->setFont(oldFont);
             mStatusLabel->setText(tr("Ready"));
         });
         watcher->setFuture(future);
