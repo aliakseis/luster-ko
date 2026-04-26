@@ -26,7 +26,7 @@ message(STATUS "System: " ${CMAKE_HOST_SYSTEM_NAME} " " ${CMAKE_HOST_SYSTEM_VERS
 message(STATUS "Processor: " ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
 # add version define
-set(APP_VERSION 0.1.2)
+set(APP_VERSION 0.1.3)
 
 add_compile_definitions(APP_VERSION="${APP_VERSION}")
 
