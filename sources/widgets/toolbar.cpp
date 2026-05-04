@@ -115,6 +115,10 @@ void ToolBar::initializeItems()
     bLayout->addWidget(mSColorChooser, 6, 1);
     bLayout->addWidget(penSizeSpin, 7, 0, 1, 2);
 
+    mMarkupButton = new QPushButton(tr("Markup"));
+    mMarkupButton->setCheckable(true);
+    bLayout->addWidget(mMarkupButton, 8, 0, 1, 2);
+
     //QWidget *tWidget = new QWidget();
     //tWidget->setLayout(tLayout);
 

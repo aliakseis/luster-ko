@@ -29,6 +29,7 @@
 #include "../app_enums.h"
 
 #include <QToolBar>
+#include <QPushButton>
 
 QT_BEGIN_NAMESPACE
 class QToolButton;
@@ -45,6 +46,8 @@ class ToolBar : public QToolBar
 
 public:
     explicit ToolBar(const QMap<InstrumentsEnum, QAction*> &actMap, QWidget *parent = 0);
+
+    QPushButton* mMarkupButton{};
 
 private:
     /**

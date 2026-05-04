@@ -105,7 +105,7 @@ private:
     QMap<InstrumentsEnum, QAction*> mInstrumentsActMap;
     QMap<int, QAction*> mEffectsActMap;
     QAction *mSaveAction, *mSaveAsAction, *mCloseAction, *separatorAct, *mPrintAction,
-            *mUndoAction, *mRedoAction, *mCopyAction, *mCutAction,
+            *mUndoAction, *mRedoAction, *mCopyAction, *mCutAction, *mMarkupModeAction,
             *mNewAction, *mOpenAction, *mExitAction, *mPasteAction, *mZoomInAction, *mZoomOutAction;
     QMenu *mFileMenu, *mInstrumentsMenu, *mEffectsMenu, *mToolsMenu;
     QUndoGroup *mUndoStackGroup;

@@ -88,6 +88,12 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
 
     initializeMainMenu();
     initializeToolBars();
+
+    // Connect markup mode button and action
+    connect(mToolbar->mMarkupButton, &QToolButton::toggled, this, &MainWindow::onMarkupMode);
+    connect(mToolbar->mMarkupButton, &QToolButton::toggled, mMarkupModeAction, &QAction::setChecked);
+    connect(mMarkupModeAction, &QAction::toggled, mToolbar->mMarkupButton, &QToolButton::setChecked);
+
     initializeStatusBar();
     initializeTabWidget();
 
@@ -337,10 +343,10 @@ void MainWindow::initializeMainMenu()
         mInstrumentsMenu->addAction(action);
     }
     {
-        QAction* action = new QAction(tr("Markup mode"), this);
-        action->setCheckable(true);
-        connect(action, SIGNAL(triggered(bool)), this, SLOT(onMarkupMode(bool)));
-        mInstrumentsMenu->addAction(action);
+        mMarkupModeAction = new QAction(tr("Markup mode"), this);
+        mMarkupModeAction->setCheckable(true);
+        connect(mMarkupModeAction, SIGNAL(triggered(bool)), this, SLOT(onMarkupMode(bool)));
+        mInstrumentsMenu->addAction(mMarkupModeAction);
     }
 
     mEffectsMenu = menuBar()->addMenu(tr("E&ffects"));
