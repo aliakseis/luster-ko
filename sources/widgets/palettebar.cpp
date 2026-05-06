@@ -41,7 +41,7 @@ void PaletteBar::initializeItems()
     const QColor colorList[] = {
         Qt::black, Qt::white, Qt::red, Qt::darkRed, Qt::green, Qt::darkGreen,
         Qt::blue, Qt::darkBlue, Qt::cyan, Qt::darkCyan, Qt::magenta,
-        Qt::darkMagenta, Qt::yellow, Qt::darkYellow, Qt::gray
+        Qt::darkMagenta, Qt::yellow, Qt::darkYellow, Qt::gray, Qt::transparent
     };
     for (const auto& color : colorList)
     {
