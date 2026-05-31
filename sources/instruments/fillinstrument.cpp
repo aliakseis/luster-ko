@@ -203,21 +203,18 @@ void FillInstrument::mouseReleaseEvent(QMouseEvent *event, ImageArea &imageArea)
 
 void FillInstrument::paint(ImageArea& imageArea, bool isSecondaryColor, bool)
 {
-    QColor switchColor;
-    if (!isSecondaryColor)
-        switchColor = DataSingleton::Instance()->getPrimaryColor();
-    else
-        switchColor = DataSingleton::Instance()->getSecondaryColor();
+    const QColor switchColor = imageArea.isMarkupMode()
+        ? (isSecondaryColor ? Qt::darkGray : Qt::black)
+        : (isSecondaryColor ? DataSingleton::Instance()->getSecondaryColor() 
+            : DataSingleton::Instance()->getPrimaryColor());
 
-    //QRgb pixel(imageArea.getImage()->pixel(mStartPoint));
-    //QColor oldColor(pixel);
-    auto oldColor = localMedianRGB(*imageArea.getImage(), mStartPoint.x(), mStartPoint.y());
+    QImage& img = imageArea.isMarkupMode() ? *imageArea.getMarkup() : *imageArea.getImage();
+
+    auto oldColor = localMedianRGB(img, mStartPoint.x(), mStartPoint.y());
 
     if (switchColor != oldColor)
     {
-        fill(mStartPoint.x(), mStartPoint.y(),
-            switchColor.rgba(), oldColor,
-            *imageArea.getImage());
+        fill(mStartPoint.x(), mStartPoint.y(), switchColor.rgba(), oldColor, img);
     }
 
     imageArea.setEdited(true);
