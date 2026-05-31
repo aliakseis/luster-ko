@@ -81,13 +81,14 @@ void PencilInstrument::mouseReleaseEvent(QMouseEvent *event, ImageArea &imageAre
 
 void PencilInstrument::paint(ImageArea &imageArea, bool isSecondaryColor, bool)
 {
-    const bool isMarkup = imageArea.isMarkupMode() && !isSecondaryColor;
+    const bool isMarkup = imageArea.isMarkupMode();
 
     QPainter painter(isMarkup ? imageArea.getMarkup() : imageArea.getImage());
-    painter.setPen(QPen(isSecondaryColor ? DataSingleton::Instance()->getSecondaryColor() :
-        (isMarkup ? Qt::black : DataSingleton::Instance()->getPrimaryColor()),
-                        DataSingleton::Instance()->getPenSize(), // * imageArea.getZoomFactor(),
-                        Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setPen(QPen(isMarkup ? (isSecondaryColor ? Qt::darkGray : Qt::black) :
+        (isSecondaryColor ? DataSingleton::Instance()->getSecondaryColor() :
+            DataSingleton::Instance()->getPrimaryColor()),
+        DataSingleton::Instance()->getPenSize(), // * imageArea.getZoomFactor(),
+        Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
 
     if(mStartPoint != mEndPoint)
     {

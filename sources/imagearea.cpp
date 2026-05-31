@@ -532,14 +532,55 @@ void ImageArea::paintEvent(QPaintEvent *event)
         painter.scale(mZoomFactor, mZoomFactor);
         painter.drawImage(QPoint(0, 0), mImage);
 
-        // Convert monochrome mask to a QBitmap and then QRegion:
-        QImage monoMask = mMarkup.convertToFormat(QImage::Format_Mono);
-        QBitmap bitmapMask = QBitmap::fromImage(monoMask);
-        QRegion clipRegion(bitmapMask);
+        assert(mMarkup.format() == QImage::Format_Grayscale8);
 
-        painter.setClipRegion(clipRegion);
+        QImage primary(mMarkup.size(), QImage::Format_Mono);
+        QImage secondary(mMarkup.size(), QImage::Format_Mono);
 
-        painter.fillRect(mImage.rect(), DataSingleton::Instance()->getPrimaryColor());
+        primary.fill(Qt::color0);
+        secondary.fill(Qt::color0);
+
+        // Build masks
+        for (int y = 0; y < mMarkup.height(); ++y)
+        {
+            const uchar* src = mMarkup.constScanLine(y);
+            uchar* dstPrimary = primary.scanLine(y);
+            uchar* dstSecondary = secondary.scanLine(y);
+
+            for (int x = 0; x < mMarkup.width(); ++x)
+            {
+                uchar v = src[x];
+
+                if (v >= 0x40)
+                {
+                    dstPrimary[x >> 3] |= (0x80 >> (x & 7));   // set bit -> white -> inside mask
+                }
+                if (v < 0x40 || v >= 0xC0)
+                {
+                    dstSecondary[x >> 3] |= (0x80 >> (x & 7));   // set bit -> white -> inside mask
+                }
+            }
+        }
+
+        {
+            // Convert monochrome mask to a QBitmap and then QRegion:
+            QBitmap bitmapMask = QBitmap::fromImage(primary);
+            QRegion clipRegion(bitmapMask);
+
+            painter.setClipRegion(clipRegion);
+
+            painter.fillRect(mImage.rect(), DataSingleton::Instance()->getPrimaryColor());
+        }
+
+        {
+            // Convert monochrome mask to a QBitmap and then QRegion:
+            QBitmap bitmapMask = QBitmap::fromImage(secondary);
+            QRegion clipRegion(bitmapMask);
+
+            painter.setClipRegion(clipRegion);
+
+            painter.fillRect(mImage.rect(), DataSingleton::Instance()->getSecondaryColor());
+        }
 
         painter.restore();
     }

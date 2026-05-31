@@ -114,7 +114,7 @@ void CurveLineInstrument::mouseReleaseEvent(QMouseEvent *event, ImageArea &image
 
 void CurveLineInstrument::paint(ImageArea &imageArea, bool isSecondaryColor, bool)
 {
-    const bool isMarkup = imageArea.isMarkupMode() && !isSecondaryColor;
+    const bool isMarkup = imageArea.isMarkupMode();
 
     QPainter painter(isMarkup ? imageArea.getMarkup() : imageArea.getImage());
     //make Bezier curve path
@@ -122,10 +122,11 @@ void CurveLineInstrument::paint(ImageArea &imageArea, bool isSecondaryColor, boo
     path.moveTo(mStartPoint);
     path.cubicTo(mFirstControlPoint, mSecondControlPoint, mEndPoint);
     //choose color
-    painter.setPen(QPen(isSecondaryColor ? DataSingleton::Instance()->getSecondaryColor() :
-        (isMarkup ? Qt::black : DataSingleton::Instance()->getPrimaryColor()),
-                        DataSingleton::Instance()->getPenSize(), // * imageArea.getZoomFactor(),
-                        Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    painter.setPen(QPen(isMarkup ? (isSecondaryColor ? Qt::darkGray : Qt::black) :
+        (isSecondaryColor ? DataSingleton::Instance()->getSecondaryColor() :
+            DataSingleton::Instance()->getPrimaryColor()),
+        DataSingleton::Instance()->getPenSize(), // * imageArea.getZoomFactor(),
+        Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     //draw Bezier curve with given path
     painter.strokePath(path, painter.pen());
 

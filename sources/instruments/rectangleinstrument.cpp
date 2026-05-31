@@ -82,7 +82,7 @@ void RectangleInstrument::mouseReleaseEvent(QMouseEvent *event, ImageArea &image
 
 void RectangleInstrument::paint(ImageArea &imageArea, bool isSecondaryColor, bool)
 {
-    const bool isMarkup = imageArea.isMarkupMode() && !isSecondaryColor;
+    const bool isMarkup = imageArea.isMarkupMode();
 
     QPainter painter(isMarkup ? imageArea.getMarkup() : imageArea.getImage());
     painter.setPen(QPen(isMarkup ? Qt::black : DataSingleton::Instance()->getPrimaryColor(),
@@ -90,7 +90,7 @@ void RectangleInstrument::paint(ImageArea &imageArea, bool isSecondaryColor, boo
                         Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     if(isSecondaryColor)
     {
-        painter.setBrush(QBrush(DataSingleton::Instance()->getSecondaryColor()));
+        painter.setBrush(QBrush(isMarkup ? Qt::darkGray : DataSingleton::Instance()->getSecondaryColor()));
     }
     if(mStartPoint != mEndPoint)
     {
