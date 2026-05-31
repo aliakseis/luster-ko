@@ -72,7 +72,10 @@ ImageArea* ScriptEffect::applyEffect(ImageArea* imageArea)
             if (!imageArea)
                 imageArea = initializeNewTab();
 
-            imageArea->setImage(img);
+            if (img.format() == QImage::Format_Grayscale8)
+                imageArea->setMarkup(img);
+            else
+                imageArea->setImage(img);
             imageArea->fixSize(true);
             imageArea->setEdited(true);
             imageArea->update();

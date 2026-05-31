@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 from PIL import Image
+from skimage.segmentation import slic, find_boundaries
+from skimage.util import img_as_ubyte
 
 def denoise_image(image: np.ndarray, strength: int = 10) -> np.ndarray:
     """Applies denoising to an image using OpenCV's fastNlMeansDenoisingColored.
@@ -208,3 +210,28 @@ def generate_plasma(width: int = 800, height: int = 800) -> np.ndarray:
     plasma = cv2.normalize(Z, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
     return cv2.applyColorMap(plasma, cv2.COLORMAP_TWILIGHT)
 
+
+
+def superpixel_contours(image:np.ndarray, n_segments: int=200, compactness: float=10.0):
+    """
+    Generate black superpixel contours on white background.
+    Works for grayscale or RGB images.
+
+    Returns: uint8 monochrome image (0 = black contour, 255 = white)
+    """
+    # Ensure float image for SLIC
+    img_float = image.astype(np.float32) / 255.0
+
+    # Compute superpixels
+    labels = slic(img_float, n_segments=n_segments, compactness=compactness, start_label=0)
+
+    # Find boundaries between superpixels
+    boundaries = find_boundaries(labels, mode='outer')
+
+    # Create white background
+    out = np.full(boundaries.shape, 255, dtype=np.uint8)
+
+    # Draw black contours
+    out[boundaries] = 0
+
+    return out

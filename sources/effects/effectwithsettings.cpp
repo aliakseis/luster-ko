@@ -43,14 +43,17 @@ ImageArea* EffectWithSettings::applyEffect(ImageArea* imageArea)
     {
         makeUndoCommand(imageArea);
 
-        const auto image = dlg.getChangedImage();
+        const auto img = dlg.getChangedImage();
 
         if (!imageArea)
         {
             imageArea = initializeNewTab();
         }
 
-        imageArea->setImage(image);
+        if (img.format() == QImage::Format_Grayscale8)
+            imageArea->setMarkup(img);
+        else
+            imageArea->setImage(img);
         imageArea->fixSize(true);
         imageArea->setEdited(true);
         imageArea->update();
