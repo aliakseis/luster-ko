@@ -136,7 +136,7 @@ namespace {
                     for (int k = 0; k < channels; ++k) {
                         // compute byte offset
                         ptrdiff_t off = i * info.strides[0] + j * info.strides[1] + k * info.strides[2];
-                        const unsigned char* p = reinterpret_cast<const unsigned char*>(reinterpret_cast<const char*>(info.ptr) + off);
+                        const unsigned char* p = static_cast<const unsigned char*>(info.ptr) + off;
                         dest[j * channels + k] = *p;
                     }
                 }
