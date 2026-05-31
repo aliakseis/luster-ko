@@ -36,353 +36,349 @@ using namespace py::literals;
 
 namespace {
 
-    // UI-safe async error dialog (invoked from any thread)
-    void showErrorAsync(const QString& title, const QString& message) {
-        QMetaObject::invokeMethod(
-            qApp,
-            [title, message]() {
-                QApplication* app = qobject_cast<QApplication*>(QCoreApplication::instance());
-                QWidget* parent = app ? app->activeWindow() : nullptr;
-                QMessageBox::critical(parent, title, message);
-            },
-            Qt::QueuedConnection);
-    }
+// UI-safe async error dialog (invoked from any thread)
+void showErrorAsync(const QString& title, const QString& message) {
+    QMetaObject::invokeMethod(
+        qApp,
+        [title, message]() {
+            QApplication* app = qobject_cast<QApplication*>(QCoreApplication::instance());
+            QWidget* parent = app ? app->activeWindow() : nullptr;
+            QMessageBox::critical(parent, title, message);
+        },
+        Qt::QueuedConnection);
+}
 
-    bool isPythonInstalled()
-    {
-        const int status =
-            QProcess::execute(QCoreApplication::applicationFilePath(),
-                QStringList() << CHECK_PYTHON_OPTION);
+bool isPythonInstalled()
+{
+    const int status =
+        QProcess::execute(QCoreApplication::applicationFilePath(),
+            QStringList() << CHECK_PYTHON_OPTION);
 
-        return status == 0;
-    }
+    return status == 0;
+}
 
-    //------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // Converts a QImage to a contiguous pybind11::array (NumPy array).
 // The function ensures the QImage is in Format_RGB888 (3-channel format).
-    py::array qimage_to_nparray(const QImage& inImage) {
-        // Convert image to a well-defined RGB format.
-        QImage image = inImage.convertToFormat(QImage::Format_RGB888);
+py::array qimage_to_nparray(const QImage& inImage) {
+    // Convert image to a well-defined RGB format.
+    QImage image = inImage.convertToFormat(QImage::Format_RGB888);
 
-        int height = image.height();
-        int width = image.width();
-        constexpr int channels = 3; // RGB
+    int height = image.height();
+    int width = image.width();
+    constexpr int channels = 3; // RGB
 
-        // Allocate a new contiguous NumPy array with shape (height, width, 3).
-        py::array_t<uchar> arr({ height, width, channels });
-        py::buffer_info buf = arr.request();
-        uchar* dest = static_cast<uchar*>(buf.ptr);
+    // Allocate a new contiguous NumPy array with shape (height, width, 3).
+    py::array_t<uchar> arr({ height, width, channels });
+    py::buffer_info buf = arr.request();
+    uchar* dest = static_cast<uchar*>(buf.ptr);
 
-        // Copy row-by-row to ensure a contiguous memory layout.
-        for (int i = 0; i < height; i++) {
-            const uchar* src = image.constScanLine(i);
-            std::memcpy(dest + i * (width * channels), src, width * channels);
-        }
-
-        return arr;
+    // Copy row-by-row to ensure a contiguous memory layout.
+    for (int i = 0; i < height; i++) {
+        const uchar* src = image.constScanLine(i);
+        std::memcpy(dest + i * (width * channels), src, width * channels);
     }
 
-    uint8_t clip_uint8(long a) {
-        const uint8_t noOverflowCandidate = static_cast<uint8_t>(a);
-        return (noOverflowCandidate == a) ? noOverflowCandidate : ((noOverflowCandidate < a) ? UINT8_MAX : 0);
-    }
+    return arr;
+}
 
-    QImage nparray_to_qimage(const py::array& a)
+uint8_t clip_uint8(long a) {
+    const uint8_t noOverflowCandidate = static_cast<uint8_t>(a);
+    return (noOverflowCandidate == a) ? noOverflowCandidate : ((noOverflowCandidate < a) ? UINT8_MAX : 0);
+}
+
+QImage nparray_to_qimage(const py::array& a)
+{
+    py::buffer_info info = a.request();
+
+    if (info.ndim < 2 || info.ndim > 3)
+        throw std::invalid_argument("Expected array with 2 or 3 dimensions");
+
+    const int height = static_cast<int>(info.shape[0]);
+    const int width = static_cast<int>(info.shape[1]);
+
+    const int channels = (info.ndim == 3) ? static_cast<int>(info.shape[2]) : 1;   // H x W x C
+
+    if (channels != 1 && channels != 3)
+        throw std::invalid_argument("Only 1‑channel (grayscale) or 3‑channel (RGB) arrays are supported");
+
+    // Choose output format
+    QImage image(width, height, (channels == 1) ? QImage::Format_Grayscale8 : QImage::Format_RGB888);
+
+    // Helper for float reading
+    auto read_float_at = [&](int i, int j, int k) -> float {
+        const char* base = static_cast<const char*>(info.ptr);
+        ptrdiff_t off = i * info.strides[0] + j * info.strides[1];
+        if (channels > 1)
+            off += k * info.strides[2];
+        const float* p = reinterpret_cast<const float*>(base + off);
+        return *p;
+        };
+
+    // -----------------------------
+    // UINT8 INPUT
+    // -----------------------------
+    if (info.format == py::format_descriptor<unsigned char>::format())
     {
-        py::buffer_info info = a.request();
+        const unsigned char* src = static_cast<const unsigned char*>(info.ptr);
 
-        if (info.ndim < 2 || info.ndim > 3)
-            throw std::invalid_argument("Expected array with 2 or 3 dimensions");
-
-        int height = static_cast<int>(info.shape[0]);
-        int width = static_cast<int>(info.shape[1]);
-
-        int channels = 1;
-        if (info.ndim == 3)
-            channels = static_cast<int>(info.shape[2]);   // H x W x C
-
-        if (channels != 1 && channels != 3)
-            throw std::invalid_argument("Only 1‑channel (grayscale) or 3‑channel (RGB) arrays are supported");
-
-        // Choose output format
-        QImage image =
-            (channels == 1)
-            ? QImage(width, height, QImage::Format_Grayscale8)
-            : QImage(width, height, QImage::Format_RGB888);
-
-        // Helper for float reading
-        auto read_float_at = [&](int i, int j, int k) -> float {
-            const char* base = static_cast<const char*>(info.ptr);
-            ptrdiff_t off = i * info.strides[0] + j * info.strides[1];
-            if (channels > 1)
-                off += k * info.strides[2];
-            const float* p = reinterpret_cast<const float*>(base + off);
-            return *p;
-            };
-
-        // -----------------------------
-        // UINT8 INPUT
-        // -----------------------------
-        if (info.format == py::format_descriptor<unsigned char>::format())
+        // Fast path: HWC contiguous
+        if (channels == 3 &&
+            info.ndim == 3 &&
+            info.strides[0] == width * 3 &&
+            info.strides[1] == 3 &&
+            info.strides[2] == 1)
         {
-            const unsigned char* src = static_cast<const unsigned char*>(info.ptr);
-
-            // Fast path: HWC contiguous
-            if (channels == 3 &&
-                info.ndim == 3 &&
-                info.strides[0] == width * 3 &&
-                info.strides[1] == 3 &&
-                info.strides[2] == 1)
-            {
-                for (int i = 0; i < height; ++i)
-                    std::memcpy(image.scanLine(i), src + i * width * 3, width * 3);
-                return image;
-            }
-
-            // Fast path: grayscale contiguous
-            if (channels == 1 &&
-                info.ndim == 3 &&
-                info.strides[0] == width &&
-                info.strides[1] == 1)
-            {
-                for (int i = 0; i < height; ++i)
-                    std::memcpy(image.scanLine(i), src + i * width, width);
-                return image;
-            }
-
-            // General stride‑aware fallback
             for (int i = 0; i < height; ++i)
-            {
-                unsigned char* dest = image.scanLine(i);
-                for (int j = 0; j < width; ++j)
-                {
-                    if (channels == 1)
-                    {
-                        ptrdiff_t off = i * info.strides[0] + j * info.strides[1];
-                        dest[j] = *(src + off);
-                    }
-                    else
-                    {
-                        for (int k = 0; k < 3; ++k)
-                        {
-                            ptrdiff_t off = i * info.strides[0] + j * info.strides[1] + k * info.strides[2];
-                            dest[j * 3 + k] = *(src + off);
-                        }
-                    }
-                }
-            }
+                std::memcpy(image.scanLine(i), src + i * width * 3, width * 3);
             return image;
         }
 
-        // -----------------------------
-        // FLOAT INPUT
-        // -----------------------------
-        if (info.format == py::format_descriptor<float>::format())
+        // Fast path: grayscale contiguous
+        if (channels == 1 &&
+            info.ndim == 3 &&
+            info.strides[0] == width &&
+            info.strides[1] == 1)
         {
-            const float* src = static_cast<const float*>(info.ptr);
-
-            // HWC contiguous (float)
-            if (channels == 3 &&
-                info.ndim == 3 &&
-                info.strides[2] == sizeof(float) &&
-                info.strides[1] == 3 * sizeof(float))
-            {
-                for (int i = 0; i < height; ++i)
-                {
-                    unsigned char* dest = image.scanLine(i);
-                    for (int j = 0; j < width; ++j)
-                    {
-                        for (int k = 0; k < 3; ++k)
-                        {
-                            float v = src[i * width * 3 + j * 3 + k];
-                            dest[j * 3 + k] = clip_uint8(std::lround(v * 255.0f));
-                        }
-                    }
-                }
-                return image;
-            }
-
-            // HWC contiguous grayscale
-            if (channels == 1 &&
-                info.ndim == 3 &&
-                info.strides[2] == sizeof(float))
-            {
-                for (int i = 0; i < height; ++i)
-                {
-                    unsigned char* dest = image.scanLine(i);
-                    for (int j = 0; j < width; ++j)
-                    {
-                        float v = src[i * width + j];
-                        dest[j] = clip_uint8(std::lround(v * 255.0f));
-                    }
-                }
-                return image;
-            }
-
-            // CHW contiguous (float)
-            if (channels == 3 &&
-                info.ndim == 3 &&
-                info.shape[0] == 3 &&
-                info.strides[1] == width * sizeof(float))
-            {
-                for (int i = 0; i < height; ++i)
-                {
-                    unsigned char* dest = image.scanLine(i);
-                    for (int j = 0; j < width; ++j)
-                    {
-                        for (int k = 0; k < 3; ++k)
-                        {
-                            float v = src[k * width * height + i * width + j];
-                            dest[j * 3 + k] = clip_uint8(std::lround(v * 255.0f));
-                        }
-                    }
-                }
-                return image;
-            }
-
-            // CHW grayscale
-            if (channels == 1 &&
-                info.ndim == 3 &&
-                info.shape[0] == 1)
-            {
-                for (int i = 0; i < height; ++i)
-                {
-                    unsigned char* dest = image.scanLine(i);
-                    for (int j = 0; j < width; ++j)
-                    {
-                        float v = src[i * width + j];
-                        dest[j] = clip_uint8(std::lround(v * 255.0f));
-                    }
-                }
-                return image;
-            }
-
-            // General stride‑aware fallback
             for (int i = 0; i < height; ++i)
-            {
-                unsigned char* dest = image.scanLine(i);
-                for (int j = 0; j < width; ++j)
-                {
-                    if (channels == 1)
-                    {
-                        float v = read_float_at(i, j, 0);
-                        dest[j] = clip_uint8(std::lround(v * 255.0f));
-                    }
-                    else
-                    {
-                        for (int k = 0; k < 3; ++k)
-                        {
-                            float v = read_float_at(i, j, k);
-                            dest[j * 3 + k] = clip_uint8(std::lround(v * 255.0f));
-                        }
-                    }
-                }
-            }
+                std::memcpy(image.scanLine(i), src + i * width, width);
             return image;
         }
 
-        throw std::invalid_argument("nparray_to_qimage: Expected dtype uint8 or float");
+        // General stride‑aware fallback
+        for (int i = 0; i < height; ++i)
+        {
+            unsigned char* dest = image.scanLine(i);
+            for (int j = 0; j < width; ++j)
+            {
+                if (channels == 1)
+                {
+                    ptrdiff_t off = i * info.strides[0] + j * info.strides[1];
+                    dest[j] = *(src + off);
+                }
+                else
+                {
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        ptrdiff_t off = i * info.strides[0] + j * info.strides[1] + k * info.strides[2];
+                        dest[j * 3 + k] = *(src + off);
+                    }
+                }
+            }
+        }
+        return image;
     }
+
+    // -----------------------------
+    // FLOAT INPUT
+    // -----------------------------
+    if (info.format == py::format_descriptor<float>::format())
+    {
+        const float* src = static_cast<const float*>(info.ptr);
+
+        // HWC contiguous (float)
+        if (channels == 3 &&
+            info.ndim == 3 &&
+            info.strides[2] == sizeof(float) &&
+            info.strides[1] == 3 * sizeof(float))
+        {
+            for (int i = 0; i < height; ++i)
+            {
+                unsigned char* dest = image.scanLine(i);
+                for (int j = 0; j < width; ++j)
+                {
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        float v = src[i * width * 3 + j * 3 + k];
+                        dest[j * 3 + k] = clip_uint8(std::lround(v * 255.0f));
+                    }
+                }
+            }
+            return image;
+        }
+
+        // HWC contiguous grayscale
+        if (channels == 1 &&
+            info.ndim == 3 &&
+            info.strides[2] == sizeof(float))
+        {
+            for (int i = 0; i < height; ++i)
+            {
+                unsigned char* dest = image.scanLine(i);
+                for (int j = 0; j < width; ++j)
+                {
+                    float v = src[i * width + j];
+                    dest[j] = clip_uint8(std::lround(v * 255.0f));
+                }
+            }
+            return image;
+        }
+
+        // CHW contiguous (float)
+        if (channels == 3 &&
+            info.ndim == 3 &&
+            info.shape[0] == 3 &&
+            info.strides[1] == width * sizeof(float))
+        {
+            for (int i = 0; i < height; ++i)
+            {
+                unsigned char* dest = image.scanLine(i);
+                for (int j = 0; j < width; ++j)
+                {
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        float v = src[k * width * height + i * width + j];
+                        dest[j * 3 + k] = clip_uint8(std::lround(v * 255.0f));
+                    }
+                }
+            }
+            return image;
+        }
+
+        // CHW grayscale
+        if (channels == 1 &&
+            info.ndim == 3 &&
+            info.shape[0] == 1)
+        {
+            for (int i = 0; i < height; ++i)
+            {
+                unsigned char* dest = image.scanLine(i);
+                for (int j = 0; j < width; ++j)
+                {
+                    float v = src[i * width + j];
+                    dest[j] = clip_uint8(std::lround(v * 255.0f));
+                }
+            }
+            return image;
+        }
+
+        // General stride‑aware fallback
+        for (int i = 0; i < height; ++i)
+        {
+            unsigned char* dest = image.scanLine(i);
+            for (int j = 0; j < width; ++j)
+            {
+                if (channels == 1)
+                {
+                    float v = read_float_at(i, j, 0);
+                    dest[j] = clip_uint8(std::lround(v * 255.0f));
+                }
+                else
+                {
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        float v = read_float_at(i, j, k);
+                        dest[j * 3 + k] = clip_uint8(std::lround(v * 255.0f));
+                    }
+                }
+            }
+        }
+        return image;
+    }
+
+    throw std::invalid_argument("nparray_to_qimage: Expected dtype uint8 or float");
+}
 
 //------------------------------------------------------------------------------
 // Helper: Convert a QVariant to a py::object with better type handling
-    py::object convertQVariantToPyObject(const QVariant& var)
-    {
-        // If the QVariant wraps a QImage, use our conversion function.
-        if (var.canConvert<QImage>()) {
-            QImage image = var.value<QImage>();
-            return qimage_to_nparray(image);  // Returns a py::array for an image.
-        }
-        // Handle fundamental types.
-        if (var.type() == QMetaType::Int)
-            return py::cast(var.toInt());
-        if (var.type() == QMetaType::Double)
-            return py::cast(var.toDouble());
-        if (var.type() == QMetaType::Bool)
-            return py::cast(var.toBool());
-        if (var.type() == QMetaType::QString)
-            return py::cast(var.toString().toStdString());
-        if (var.type() == QVariant::PointF) {
-            QPointF point = var.toPointF();
-            return py::cast(std::complex<double>(point.x(), point.y()));  // Convert to Python complex
-        }
-
-        // Handle lists.
-        if (var.canConvert<QVariantList>()) {
-            QVariantList list = var.toList();
-            py::list pyList;
-            for (const QVariant& item : qAsConst(list)) {
-                pyList.append(convertQVariantToPyObject(item));
-            }
-            return pyList;
-        }
-        // Handle maps.
-        if (var.canConvert<QVariantMap>()) {
-            QVariantMap map = var.toMap();
-            py::dict pyDict;
-            for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
-                pyDict[py::cast(it.key().toStdString())] =
-                    convertQVariantToPyObject(it.value());
-            }
-            return pyDict;
-        }
-        // Fallback: convert to string.
+py::object convertQVariantToPyObject(const QVariant& var)
+{
+    // If the QVariant wraps a QImage, use our conversion function.
+    if (var.canConvert<QImage>()) {
+        QImage image = var.value<QImage>();
+        return qimage_to_nparray(image);  // Returns a py::array for an image.
+    }
+    // Handle fundamental types.
+    if (var.type() == QMetaType::Int)
+        return py::cast(var.toInt());
+    if (var.type() == QMetaType::Double)
+        return py::cast(var.toDouble());
+    if (var.type() == QMetaType::Bool)
+        return py::cast(var.toBool());
+    if (var.type() == QMetaType::QString)
         return py::cast(var.toString().toStdString());
+    if (var.type() == QVariant::PointF) {
+        QPointF point = var.toPointF();
+        return py::cast(std::complex<double>(point.x(), point.y()));  // Convert to Python complex
     }
 
-    // Helper structure for docstring parameter info.
-    struct DocParamInfo {
-        QString type;
-        QString description;
-    };
-
-    // Returns a pair where the first element is the common description (first paragraph)
-    // and the second element is a map from parameter names to DocParamInfo.
-    std::pair<QString, std::map<QString, DocParamInfo>> parseDocstring(const QString& docString) {
-        if (docString.isEmpty())
-            return {};
-
-        std::map<QString, DocParamInfo> params;
-
-        // Extract the common description (first paragraph)
-        QRegularExpression descExp(R"(^([\s\S]*?)\n\n)");
-        auto descMatch = descExp.match(docString);
-        QString description = descMatch.hasMatch() ? descMatch.captured(1).trimmed() : "";
-
-        // Locate the Args: section
-        QRegularExpression argsSectionExp(R"(Args:\s*((?:.|\n)*))");
-        auto argsMatch = argsSectionExp.match(docString);
-        if (argsMatch.hasMatch()) {
-            QString argsSection = argsMatch.captured(1);
-            // Capture parameter lines (one parameter per line)
-            QRegularExpression paramExp(R"(^\s*(\w+)\s*\(([^,)]+)(?:,\s*optional)?\):\s*(.+)$)",
-                QRegularExpression::MultilineOption);
-            QRegularExpressionMatchIterator it = paramExp.globalMatch(argsSection);
-            while (it.hasNext()) {
-                QRegularExpressionMatch match = it.next();
-                auto name = match.captured(1);
-                DocParamInfo param;
-                param.type = match.captured(2);
-                param.description = match.captured(3);
-                params[name] = param;
-            }
+    // Handle lists.
+    if (var.canConvert<QVariantList>()) {
+        QVariantList list = var.toList();
+        py::list pyList;
+        for (const QVariant& item : qAsConst(list)) {
+            pyList.append(convertQVariantToPyObject(item));
         }
-        return { description, params };
+        return pyList;
     }
-
-    // Python-level stream
-    struct PythonQtStream {
-        static std::function<void(const std::string&)> sink;
-        int write(const std::string& s) {
-            if (sink) sink(s);
-            return (int)s.size();
+    // Handle maps.
+    if (var.canConvert<QVariantMap>()) {
+        QVariantMap map = var.toMap();
+        py::dict pyDict;
+        for (auto it = map.constBegin(); it != map.constEnd(); ++it) {
+            pyDict[py::cast(it.key().toStdString())] =
+                convertQVariantToPyObject(it.value());
         }
-        void flush() {}
-        bool isatty() const { return true; }
-        int fileno() const { return -1; }  // the stream as a nonfile object
-        std::string encoding() const { return "utf-8"; }
-    };
-    inline std::function<void(const std::string&)> PythonQtStream::sink;
+        return pyDict;
+    }
+    // Fallback: convert to string.
+    return py::cast(var.toString().toStdString());
+}
+
+// Helper structure for docstring parameter info.
+struct DocParamInfo {
+    QString type;
+    QString description;
+};
+
+// Returns a pair where the first element is the common description (first paragraph)
+// and the second element is a map from parameter names to DocParamInfo.
+std::pair<QString, std::map<QString, DocParamInfo>> parseDocstring(const QString& docString) {
+    if (docString.isEmpty())
+        return {};
+
+    std::map<QString, DocParamInfo> params;
+
+    // Extract the common description (first paragraph)
+    QRegularExpression descExp(R"(^([\s\S]*?)\n\n)");
+    auto descMatch = descExp.match(docString);
+    QString description = descMatch.hasMatch() ? descMatch.captured(1).trimmed() : "";
+
+    // Locate the Args: section
+    QRegularExpression argsSectionExp(R"(Args:\s*((?:.|\n)*))");
+    auto argsMatch = argsSectionExp.match(docString);
+    if (argsMatch.hasMatch()) {
+        QString argsSection = argsMatch.captured(1);
+        // Capture parameter lines (one parameter per line)
+        QRegularExpression paramExp(R"(^\s*(\w+)\s*\(([^,)]+)(?:,\s*optional)?\):\s*(.+)$)",
+            QRegularExpression::MultilineOption);
+        QRegularExpressionMatchIterator it = paramExp.globalMatch(argsSection);
+        while (it.hasNext()) {
+            QRegularExpressionMatch match = it.next();
+            auto name = match.captured(1);
+            DocParamInfo param;
+            param.type = match.captured(2);
+            param.description = match.captured(3);
+            params[name] = param;
+        }
+    }
+    return { description, params };
+}
+
+// Python-level stream
+struct PythonQtStream {
+    static std::function<void(const std::string&)> sink;
+    int write(const std::string& s) {
+        if (sink) sink(s);
+        return (int)s.size();
+    }
+    void flush() {}
+    bool isatty() const { return true; }
+    int fileno() const { return -1; }  // the stream as a nonfile object
+    std::string encoding() const { return "utf-8"; }
+};
+
+inline std::function<void(const std::string&)> PythonQtStream::sink;
 
 } // anonymous namespace
 
