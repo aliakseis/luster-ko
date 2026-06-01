@@ -469,6 +469,13 @@ void MainWindow::initializeToolBars()
 
     connect(mPaletteBar, &PaletteBar::colorClicked, mToolbar, &ToolBar::setPrimaryColorView);
     connect(mPaletteBar, &PaletteBar::colorClicked, mToolbar, &ToolBar::setSecondaryColorView);
+    // markup color update
+    connect(mPaletteBar, &PaletteBar::colorClicked, this, [this]() {
+        if (auto area = getCurrentImageArea()) {
+            area->update();
+        }
+        }
+    );
 }
 
 ImageArea* MainWindow::getCurrentImageArea()
