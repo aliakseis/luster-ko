@@ -926,14 +926,29 @@ void MainWindow::updateRecentFileActions()
     QSettings settings;
     QStringList files = settings.value(recentFileList).toStringList();
 
-    int numRecentFiles = qMin(files.size(), (int)MaxRecentFiles);
+    // 1) Remove non-existent files
+    QStringList cleaned;
+    cleaned.reserve(files.size());
+
+    for (const QString& f : files) {
+        if (QFile::exists(f))
+            cleaned << f;
+    }
+
+    // If anything was removed - update QSettings
+    if (cleaned != files)
+        settings.setValue(recentFileList, cleaned);
+
+    // 2) Use cleaned list
+    int numRecentFiles = qMin(cleaned.size(), (int)MaxRecentFiles);
 
     for (int i = 0; i < numRecentFiles; ++i) {
-        QString text = tr("&%1 %2").arg(i + 1).arg(strippedName(files[i]));
+        QString text = tr("&%1 %2").arg(i + 1).arg(strippedName(cleaned[i]));
         recentFileActs[i]->setText(text);
-        recentFileActs[i]->setData(files[i]);
+        recentFileActs[i]->setData(cleaned[i]);
         recentFileActs[i]->setVisible(true);
     }
+
     for (int j = numRecentFiles; j < MaxRecentFiles; ++j)
         recentFileActs[j]->setVisible(false);
 
