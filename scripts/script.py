@@ -235,3 +235,31 @@ def superpixel_contours(image:np.ndarray, n_segments: int=200, compactness: floa
     out[boundaries] = 0
 
     return out
+
+def inpaint_image(img: np.ndarray,
+                  mask: np.ndarray,
+                  radius: int = 3,
+                  method_is_telea: bool = True) -> np.ndarray:
+    """
+    Inpaints an image using cv2.inpaint with optional mask interval normalization.
+
+    normalize_mask=True:
+        - If mask has arbitrary range, it is normalized to [0, 255].
+        - Then converted to binary {0, 255} because cv2.inpaint requires binary mask.
+    """
+    method = cv2.INPAINT_TELEA if method_is_telea else cv2.INPAINT_NS
+
+    # Ensure single-channel mask
+    if mask.ndim == 3:
+        mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY)
+
+    mask = mask.astype(np.float32)
+
+    m_min = mask.min()
+    m_max = mask.max()
+
+
+    # Convert to binary mask required by OpenCV
+    mask = (mask < ((m_min + m_max) / 2)).astype(np.uint8) * 255
+
+    return cv2.inpaint(img, mask, radius, method)
