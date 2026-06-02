@@ -68,26 +68,33 @@ void EraserInstrument::mouseReleaseEvent(QMouseEvent *event, ImageArea &imageAre
 
 void EraserInstrument::paint(ImageArea &imageArea, bool, bool)
 {
-    QPainter painter(imageArea.getImage());
-    QColor color = DataSingleton::Instance()->getSecondaryColor();
+    QPainter painter(imageArea.isMarkupMode() ? imageArea.getMarkup() : imageArea.getImage());
     int penSize = DataSingleton::Instance()->getPenSize();
 
-    if (color.alpha() == 0) {
-        // Transparent -> erase
-        painter.setCompositionMode(QPainter::CompositionMode_Clear);
-        painter.setPen(QPen(Qt::transparent, penSize, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+    if (imageArea.isMarkupMode()) {
+        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+        painter.setPen(QPen(Qt::darkGray, // secondary 
+            penSize, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
     }
     else {
-        // Opaque -> normal drawing
-        painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
-        painter.setPen(QPen(color, penSize, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        QColor color = DataSingleton::Instance()->getSecondaryColor();
+        if (color.alpha() == 0) {
+            // Transparent -> erase
+            painter.setCompositionMode(QPainter::CompositionMode_Clear);
+            painter.setPen(QPen(Qt::transparent, penSize, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        }
+        else {
+            // Opaque -> normal drawing
+            painter.setCompositionMode(QPainter::CompositionMode_SourceOver);
+            painter.setPen(QPen(color, penSize, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+        }
     }
-    if(mStartPoint != mEndPoint)
+
+    if (mStartPoint != mEndPoint)
     {
         painter.drawLine(mStartPoint, mEndPoint);
     }
-
-    if(mStartPoint == mEndPoint)
+    else
     {
         painter.drawPoint(mStartPoint);
     }
