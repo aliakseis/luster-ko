@@ -59,6 +59,575 @@ Scripts can leverage all installed Python libraries.
 - ✅ Extensible via Python
 - ✅ Supports external libs (Hugging Face, OpenCV, etc.)
 
+# Python Scripting and Markup Mode
+
+## Overview
+
+Luster-ko provides a Python scripting subsystem that allows users to extend the application with custom image-processing functions.
+
+Python functions are:
+
+1. Loaded dynamically from script files.
+2. Inspected automatically.
+3. Exposed as menu actions.
+4. Executed asynchronously.
+5. Connected to the editor's image and markup layers.
+
+The system supports two operating modes:
+
+* **Image-only mode**
+* **Image + Markup mode**
+
+Markup mode allows Python scripts to receive and process a user-created mask/selection layer in addition to the main image.
+
+---
+
+# Architecture
+
+```text
+Python Script
+      │
+      ▼
+ ScriptModel
+      │
+      ▼
+ FunctionInfo
+      │
+      ▼
+ ScriptEffect
+      │
+      ▼
+ ImageArea
+ ├─ Image
+ └─ Markup
+```
+
+The central classes are:
+
+| Class                  | Responsibility                                       |
+| ---------------------- | ---------------------------------------------------- |
+| `ScriptModel`          | Python interpreter management and function execution |
+| `FunctionInfo`         | Metadata extracted from Python functions             |
+| `ScriptEffect`         | Connects menu actions with Python execution          |
+| `ScriptEffectSettings` | Generates parameter UI automatically                 |
+| `ImageArea`            | Holds image and markup layers                        |
+
+---
+
+# Python Function Discovery
+
+When a script is loaded, `ScriptModel`:
+
+1. Starts an embedded Python interpreter (`pybind11`).
+2. Executes the script.
+3. Inspects all public functions.
+4. Extracts signatures, annotations, defaults, and docstrings.
+5. Builds a list of `FunctionInfo` objects.
+
+Only public functions are exposed.
+
+Example:
+
+```python
+def blur_image(
+    image: numpy.ndarray,
+    radius: float = 5.0
+):
+    ...
+```
+
+becomes a menu item automatically.
+
+---
+
+# Function Classification
+
+The scripting system determines function behavior entirely from parameter types.
+
+## Image Processing Function
+
+```python
+def blur_image(
+    image: numpy.ndarray,
+    radius: float = 5.0
+):
+    ...
+```
+
+Detected as:
+
+```cpp
+parameters[0].annotation == "<class 'numpy.ndarray'>"
+```
+
+Result:
+
+* Receives current image
+* Appears under image effects
+* Operates on existing content
+
+---
+
+## Image Creation Function
+
+```python
+def generate_mandelbrot(
+    width: int,
+    height: int
+):
+    ...
+```
+
+Detected as:
+
+```cpp
+parameters.empty() ||
+parameters[0].annotation != "<class 'numpy.ndarray'>"
+```
+
+via:
+
+```cpp
+bool isCreatingFunction() const
+{
+    return parameters.empty()
+        || parameters[0].annotation != "<class 'numpy.ndarray'>";
+}
+```
+
+Result:
+
+* Creates a new image
+* Does not require an existing image
+* Opens result in a new tab
+
+---
+
+# Markup Mode
+
+## What Is Markup?
+
+Markup is a separate grayscale layer associated with an image.
+
+Users can draw on this layer using markup tools.
+
+Typical uses:
+
+* Selection masks
+* Inpainting masks
+* Protected regions
+* Processing constraints
+* Region-of-interest editing
+
+Conceptually:
+
+```text
+ImageArea
+├── RGB Image
+└── Grayscale Markup
+```
+
+---
+
+# Detecting Markup Support
+
+Markup support is determined automatically from the function signature.
+
+Implementation:
+
+```cpp
+bool usesMarkup() const
+{
+    return parameters.size() > 1 &&
+           parameters[1].annotation ==
+           "<class 'numpy.ndarray'>";
+}
+```
+
+A function uses markup when:
+
+* Parameter #1 is the image
+* Parameter #2 is another NumPy array
+
+Example:
+
+```python
+def inpaint(
+    image: numpy.ndarray,
+    markup: numpy.ndarray
+):
+    ...
+```
+
+The second image parameter is interpreted as the markup layer.
+
+---
+
+# How Image and Markup Are Passed
+
+When an effect executes:
+
+```cpp
+QVariantList args;
+
+args << image;
+
+if (mFunctionInfo.usesMarkup())
+    args << markup;
+```
+
+Therefore:
+
+## Image-only Function
+
+```python
+def blur_image(image):
+    ...
+```
+
+receives:
+
+```python
+image
+```
+
+---
+
+## Markup-Aware Function
+
+```python
+def inpaint(image, markup):
+    ...
+```
+
+receives:
+
+```python
+image
+markup
+```
+
+The markup is supplied automatically.
+
+No manual retrieval is necessary.
+
+---
+
+# Data Conversion
+
+The bridge converts Qt images to NumPy arrays.
+
+## Qt → Python
+
+```text
+QImage
+    ↓
+numpy.ndarray
+```
+
+Supported formats:
+
+* RGB images
+* Grayscale images
+* Float images
+
+The Python side always sees NumPy arrays.
+
+Example:
+
+```python
+def process(image):
+    print(image.shape)
+```
+
+---
+
+## Python → Qt
+
+Returned NumPy arrays are converted back to:
+
+```text
+numpy.ndarray
+      ↓
+QImage
+```
+
+and inserted into the editor.
+
+---
+
+# Returning Results
+
+A Python function returns a NumPy array.
+
+Example:
+
+```python
+def invert(image):
+    return 255 - image
+```
+
+The returned array becomes the new image.
+
+---
+
+# Returning Markup
+
+The application determines destination by image format.
+
+When a grayscale image is returned:
+
+```cpp
+if (img.format() == QImage::Format_Grayscale8)
+    imageArea->setMarkup(img);
+else
+    imageArea->setImage(img);
+```
+
+Therefore a script can generate:
+
+* a new image
+* a new markup layer
+
+depending on the returned data.
+
+---
+
+# Automatic Parameter UI
+
+Function parameters automatically generate controls.
+
+Example:
+
+```python
+def blur_image(
+    image,
+    radius: float = 5.0,
+    iterations: int = 3,
+    enabled: bool = True
+):
+    ...
+```
+
+Produces:
+
+| Python Type | UI Control       |
+| ----------- | ---------------- |
+| `int`       | Spin box         |
+| `float`     | Numeric text box |
+| `double`    | Numeric text box |
+| `bool`      | Check box        |
+| `str`       | Text box         |
+| `tuple`     | Text box         |
+| `complex`   | Complex editor   |
+
+No UI code is required.
+
+---
+
+# Docstring Integration
+
+Docstrings are parsed automatically.
+
+Example:
+
+```python
+def blur_image(
+    image,
+    radius: float = 5.0
+):
+    """
+    Blur image.
+
+    Args:
+        radius (float):
+            Blur radius.
+    """
+```
+
+The parser extracts:
+
+* Function description
+* Parameter descriptions
+* Parameter types
+
+These values populate the UI and tooltips.
+
+---
+
+# Asynchronous Execution
+
+Scripts execute in a worker thread.
+
+```cpp
+QtConcurrent::run(...)
+```
+
+Execution flow:
+
+```text
+User Action
+     │
+     ▼
+Worker Thread
+     │
+     ▼
+Python Function
+     │
+     ▼
+Result Image
+```
+
+During execution:
+
+* Main window is disabled
+* Spinner overlay is shown
+* UI remains responsive
+
+---
+
+# Progress Images
+
+The Python runtime exposes:
+
+```python
+_send_image(...)
+```
+
+A script can send intermediate images:
+
+```python
+_send_image(preview)
+```
+
+This enables:
+
+* Live previews
+* Progress visualization
+* Iterative algorithms
+
+---
+
+# Cancellation Support
+
+Python receives:
+
+```python
+_check_interrupt()
+```
+
+Example:
+
+```python
+for i in range(10000):
+
+    if _check_interrupt():
+        break
+
+    ...
+```
+
+This allows long-running scripts to stop safely.
+
+---
+
+# Python Console Output
+
+`stdout` and `stderr` are redirected to the application.
+
+Example:
+
+```python
+print("Loading model...")
+```
+
+appears inside the built-in Python console.
+
+Supported output:
+
+* `print()`
+* Exceptions
+* Warnings
+* tqdm progress bars
+
+---
+
+# Typical Markup Workflow
+
+## User Side
+
+1. Enable **Markup Mode**
+2. Draw mask
+3. Run Python effect
+
+---
+
+## Script Side
+
+```python
+def inpaint(
+    image,
+    markup
+):
+    result = model.inpaint(
+        image,
+        mask=markup
+    )
+
+    return result
+```
+
+---
+
+# Typical Processing Pipeline
+
+```text
+User draws markup
+        │
+        ▼
+ImageArea
+ ├─ Image
+ └─ Markup
+        │
+        ▼
+ScriptEffect
+        │
+        ▼
+ScriptModel
+        │
+        ▼
+Python Function
+        │
+        ▼
+NumPy Result
+        │
+        ▼
+QImage
+        │
+        ▼
+Editor Update
+```
+
+---
+
+# Summary
+
+The scripting system is built around automatic discovery of Python functions and automatic conversion between Qt images and NumPy arrays.
+
+Key features include:
+
+* Dynamic Python function discovery
+* Embedded Python interpreter
+* Automatic parameter UI generation
+* NumPy image exchange
+* Asynchronous execution
+* Console output redirection
+* Progress image support
+* Cancellation support
+* Optional markup-mask processing
+
+Markup mode integrates seamlessly with scripting: if a Python function declares a second `numpy.ndarray` parameter, the editor automatically passes the current markup layer, enabling mask-aware image processing, inpainting, selection-based effects, and region-specific operations.
+
 ## Python Scripts Overview
 
 These Python scripts extend the paint application with **image generation, transformation, and enhancement features**.  
