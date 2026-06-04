@@ -104,9 +104,7 @@ def _prompt_to_weighted_subprompts(prompt: str, base_emph: float = 1.1, trace=No
     txt = prompt
     parts = []
 
-    # stack holds (weight, position)
     stack = [(1.0, None)]
-
     cur = []
     i = 0
     emph = base_emph
@@ -118,21 +116,56 @@ def _prompt_to_weighted_subprompts(prompt: str, base_emph: float = 1.1, trace=No
     while i < len(txt):
         ch = txt[i]
 
+        # ---------------------------------------------------------
+        # SYNSET BLOCK {a|b|c}!mode
+        # ---------------------------------------------------------
+        if ch == "{":
+            if cur:
+                parts.append(("".join(cur).strip(), stack[-1][0]))
+                cur = []
+
+            j = txt.find("}", i + 1)
+            if j == -1:
+                trace.error("Unclosed synset '{...}'", i)
+                i += 1
+                continue
+
+            block = txt[i+1:j].strip()
+            i2 = j + 1
+
+            mode = "mean"
+            if i2 < len(txt) and txt[i2] == "!":
+                k = i2 + 1
+                while k < len(txt) and txt[k].isalpha():
+                    k += 1
+                mode = txt[i2+1:k]
+                i = k
+            else:
+                i = j + 1
+
+            parts.append((f"__synset__{mode}::{block}", stack[-1][0]))
+            continue
+
+        # ---------------------------------------------------------
+        # EMPHASIS "(" and DE-EMPHASIS "["
+        # ---------------------------------------------------------
         if ch == "(":
             if cur:
                 parts.append(("".join(cur).strip(), stack[-1][0]))
                 cur = []
             stack.append((stack[-1][0] * emph, i))
             i += 1
+            continue
 
-        elif ch == "[":
+        if ch == "[":
             if cur:
                 parts.append(("".join(cur).strip(), stack[-1][0]))
                 cur = []
             stack.append((stack[-1][0] * deemph, i))
             i += 1
+            continue
 
-        elif ch == ")" or ch == "]":
+        if ch == ")" or ch == "]":
             if cur:
                 parts.append(("".join(cur).strip(), stack[-1][0]))
                 cur = []
@@ -141,48 +174,66 @@ def _prompt_to_weighted_subprompts(prompt: str, base_emph: float = 1.1, trace=No
             else:
                 trace.error(f"Unmatched closing '{ch}'", i)
             i += 1
+            continue
 
-        else:
-            cur.append(ch)
-            i += 1
+        cur.append(ch)
+        i += 1
+
+    if len(stack) > 1:
+        for _, pos in stack[1:]:
+            trace.error(
+                "Unclosed emphasis/de-emphasis block",
+                pos
+            )
 
     if cur:
         parts.append(("".join(cur).strip(), stack[-1][0]))
 
-    # unclosed brackets
-    if len(stack) > 1:
-        for _, pos in stack[1:]:
-            trace.error("Unclosed bracket", pos)
-
+    # ---------------------------------------------------------
+    # FINAL SPLITTING (SAFE)
+    # ---------------------------------------------------------
     final = []
 
     for text_part, w in parts:
-        if not text_part:
-            trace.warn("Empty group detected")
+
+        # synset blocks bypass splitting entirely
+        if text_part.startswith("__synset__"):
+            final.append((text_part, w))
             continue
 
-        # detect repeated separators
-        if re.search(r"[,\|]\s*[,\|]", text_part):
-            trace.warn(f"Repeated separators in '{text_part}'")
+        # empty text
+        if not text_part.strip():
+            continue
 
-        for chunk in re.split(r"\s*\|\s*|\s*,\s*", text_part):
+        # if no separators -> add as-is
+        if "|" not in text_part and "," not in text_part:
+            final.append((text_part.strip(), w))
+            continue
+
+        # split only real separators
+        chunks = re.split(r"\s*\|\s*|\s*,\s*", text_part)
+
+        for chunk in chunks:
             s = chunk.strip()
             if not s:
-                #trace.warn("Empty fragment after split")
                 continue
 
-            # detect weight syntax
+            # synset tokens must NOT be parsed as weights
+            if s.startswith("__synset__"):
+                final.append((s, w))
+                continue
+
+            # weight syntax
             m = re.match(r"^(.*?):\s*(.+)$", s)
             if m:
                 label = m.group(1).strip()
                 weight_str = m.group(2).strip()
-
                 try:
                     val = float(weight_str)
                     final.append((label, val * w))
                 except ValueError:
                     trace.error(f"Invalid weight '{weight_str}' in '{s}'")
-                    final.append((label, w))  # fallback (unchanged behavior)
+                    final.append((label, w))
             else:
                 final.append((s, w))
 
@@ -190,6 +241,7 @@ def _prompt_to_weighted_subprompts(prompt: str, base_emph: float = 1.1, trace=No
 
 def _encode_subprompts_to_embeds(subprompts, tokenizer, text_encoder, device, max_length):
     device = torch.device(device)
+
     items = [(t.strip(), w) for t, w in subprompts if t and t.strip()]
     if not items:
         inputs = tokenizer("", padding=True, truncation=True, max_length=max_length, return_tensors="pt")
@@ -199,40 +251,122 @@ def _encode_subprompts_to_embeds(subprompts, tokenizer, text_encoder, device, ma
             out = text_encoder(input_ids=input_ids, attention_mask=attention_mask)
         return out.last_hidden_state, attention_mask
 
-    texts, weights = zip(*items)
-    inputs = tokenizer(
-        list(texts),
-        padding="longest",
-        truncation=True,
-        max_length=max_length,
-        return_tensors="pt",
-    )
-    input_ids = inputs.input_ids.to(device)
-    attention_mask = inputs.attention_mask.to(device)
+    # ---------------------------------------------------------
+    # Separate synset items from normal items
+    # ---------------------------------------------------------
+    synset_items = []
+    normal_items = []
 
-    with torch.no_grad():
-        outputs = text_encoder(input_ids=input_ids, attention_mask=attention_mask)
-        emb_batch = outputs.last_hidden_state
+    for text, w in items:
+        if text.startswith("__synset__"):
+            rest = text[len("__synset__"):]
+            parts2 = rest.split("::", 1)
 
-    batch_size, seq_len, dim = emb_batch.shape
+            if len(parts2) == 2:
+                mode, block = parts2
+            else:
+                # fallback: malformed synset -> treat as mean
+                mode = "mean"
+                block = rest
 
-    if any(float(w) != 1.0 for w in weights):
-        w_tensor = torch.tensor(weights, dtype=emb_batch.dtype, device=emb_batch.device).view(batch_size, 1, 1)
-        emb_batch = emb_batch * w_tensor
+            synset_items.append((mode, block, w))
+        else:
+            normal_items.append((text, w))
 
-    trimmed_embeds = []
-    trimmed_masks = []
-    for i in range(batch_size):
-        real_len = int(attention_mask[i].sum().item())
-        if real_len == 0:
-            real_len = 1
-        emb_i = emb_batch[i:i+1, :real_len, :].contiguous()
-        mask_i = attention_mask[i:i+1, :real_len].contiguous()
-        trimmed_embeds.append(emb_i)
-        trimmed_masks.append(mask_i)
+    items = normal_items
 
-    prompt_embeds = torch.cat(trimmed_embeds, dim=1)
-    attention_mask = torch.cat(trimmed_masks, dim=1)
+    # ---------------------------------------------------------
+    # Encode normal items
+    # ---------------------------------------------------------
+    if items:
+        texts, weights = zip(*items)
+        inputs = tokenizer(
+            list(texts),
+            padding="longest",
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        )
+        input_ids = inputs.input_ids.to(device)
+        attention_mask = inputs.attention_mask.to(device)
+
+        with torch.no_grad():
+            outputs = text_encoder(input_ids=input_ids, attention_mask=attention_mask)
+            emb_batch = outputs.last_hidden_state
+
+        batch_size, seq_len, dim = emb_batch.shape
+
+        if any(float(w) != 1.0 for w in weights):
+            w_tensor = torch.tensor(weights, dtype=emb_batch.dtype, device=emb_batch.device).view(batch_size, 1, 1)
+            emb_batch = emb_batch * w_tensor
+
+        trimmed_embeds = []
+        trimmed_masks = []
+        for i in range(batch_size):
+            real_len = int(attention_mask[i].sum().item())
+            if real_len == 0:
+                real_len = 1
+            emb_i = emb_batch[i:i+1, :real_len, :].contiguous()
+            mask_i = attention_mask[i:i+1, :real_len].contiguous()
+            trimmed_embeds.append(emb_i)
+            trimmed_masks.append(mask_i)
+
+        prompt_embeds = torch.cat(trimmed_embeds, dim=1)
+        attention_mask = torch.cat(trimmed_masks, dim=1)
+
+    else:
+        # no normal items
+        prompt_embeds = torch.zeros((1, 0, text_encoder.config.hidden_size), device=device)
+        attention_mask = torch.zeros((1, 0), dtype=torch.long, device=device)
+
+    # ---------------------------------------------------------
+    # SYNSET ENCODING (mean or PCA)
+    # ---------------------------------------------------------
+    def _encode_synset(mode, block, weight):
+        parts = [p.strip() for p in block.split("|") if p.strip()]
+        if not parts:
+            return None
+
+        tokens = tokenizer(
+            parts,
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        ).to(device)
+
+        with torch.no_grad():
+            out = text_encoder(
+                input_ids=tokens.input_ids,
+                attention_mask=tokens.attention_mask
+            ).last_hidden_state[:, 0, :]  # CLS token
+
+        # out shape: [N, dim]
+        if mode == "pca" and out.shape[0] > 1:
+            # convert to float32 for NumPy SVD
+            X = out.float().cpu().numpy().astype(np.float32)
+            X = X - X.mean(axis=0, keepdims=True)
+
+            # PCA via SVD
+            U, S, Vt = np.linalg.svd(X, full_matrices=False)
+            vec = torch.tensor(Vt[0], dtype=out.dtype, device=out.device).unsqueeze(0)
+        else:
+            vec = out.mean(dim=0, keepdim=True)
+
+        vec = vec / vec.norm(dim=-1, keepdim=True)
+        vec = vec * weight
+
+        return vec.unsqueeze(1)
+
+    # ---------------------------------------------------------
+    # Append synset embeddings
+    # ---------------------------------------------------------
+    for mode, block, w in synset_items:
+        syn_emb = _encode_synset(mode, block, w)
+        if syn_emb is not None:
+            prompt_embeds = torch.cat([prompt_embeds, syn_emb.to(device)], dim=1)
+            syn_mask = torch.ones((1, 1), dtype=attention_mask.dtype, device=device)
+            attention_mask = torch.cat([attention_mask, syn_mask], dim=1)
 
     return prompt_embeds.to(device), attention_mask.to(device)
 
