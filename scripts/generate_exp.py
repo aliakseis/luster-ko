@@ -157,6 +157,23 @@ def _prompt_to_weighted_subprompts(prompt: str, base_emph: float = 1.1, trace=No
             i += 1
             continue
 
+        m = re.match(
+            r"\[([^:\]]+):([^:\]]+):([0-9]*\.?[0-9]+)\]",
+            txt[i:]
+        )
+        if m:
+            left = m.group(1).strip()
+            right = m.group(2).strip()
+            t = float(m.group(3))
+
+            parts.append((
+                f"__interp__::{left}::{right}::{t}",
+                stack[-1][0]
+            ))
+
+            i += len(m.group(0))
+            continue
+
         if ch == "[":
             if cur:
                 parts.append(("".join(cur).strip(), stack[-1][0]))
@@ -239,6 +256,31 @@ def _prompt_to_weighted_subprompts(prompt: str, base_emph: float = 1.1, trace=No
 
     return final, trace
 
+def _parse_synset_members(block):
+    members = []
+
+    for item in block.split("|"):
+        item = item.strip()
+
+        if not item:
+            continue
+
+        m = re.match(
+            r"^(.*?):\s*(-?(?:\d+(?:\.\d*)?|\.\d+))$",
+            item
+        )
+
+        if m:
+            text = m.group(1).strip()
+            weight = float(m.group(2))
+        else:
+            text = item
+            weight = 1.0
+
+        members.append((text, weight))
+
+    return members
+
 def _encode_subprompts_to_embeds(subprompts, tokenizer, text_encoder, device, max_length):
     device = torch.device(device)
 
@@ -255,6 +297,7 @@ def _encode_subprompts_to_embeds(subprompts, tokenizer, text_encoder, device, ma
     # Separate synset items from normal items
     # ---------------------------------------------------------
     synset_items = []
+    interp_items = []
     normal_items = []
 
     for text, w in items:
@@ -270,6 +313,8 @@ def _encode_subprompts_to_embeds(subprompts, tokenizer, text_encoder, device, ma
                 block = rest
 
             synset_items.append((mode, block, w))
+        elif text.startswith("__interp__"):
+            interp_items.append((text, w))
         else:
             normal_items.append((text, w))
 
@@ -323,10 +368,17 @@ def _encode_subprompts_to_embeds(subprompts, tokenizer, text_encoder, device, ma
     # SYNSET ENCODING (mean or PCA)
     # ---------------------------------------------------------
     def _encode_synset(mode, block, weight):
-        parts = [p.strip() for p in block.split("|") if p.strip()]
-        if not parts:
+        members = _parse_synset_members(block)
+
+        if not members:
             return None
 
+        parts = [text for text, _ in members]
+        member_weights = torch.tensor(
+            [w for _, w in members],
+            dtype=torch.float32,
+            device=device
+        )
         tokens = tokenizer(
             parts,
             padding=True,
@@ -343,20 +395,58 @@ def _encode_subprompts_to_embeds(subprompts, tokenizer, text_encoder, device, ma
 
         # out shape: [N, dim]
         if mode == "pca" and out.shape[0] > 1:
+            w = member_weights.view(-1, 1)
+
+            centroid = (
+                (out * w).sum(dim=0, keepdim=True)
+                / w.sum().clamp_min(1e-8)
+            )
             # convert to float32 for NumPy SVD
-            X = out.float().cpu().numpy().astype(np.float32)
-            X = X - X.mean(axis=0, keepdims=True)
+            X = out.cpu().numpy()
+            X = X - centroid.cpu().numpy()
 
             # PCA via SVD
             U, S, Vt = np.linalg.svd(X, full_matrices=False)
             vec = torch.tensor(Vt[0], dtype=out.dtype, device=out.device).unsqueeze(0)
         else:
-            vec = out.mean(dim=0, keepdim=True)
+            w = member_weights.view(-1, 1)
+            denom = w.sum().clamp_min(1e-8)
+            vec = (out * w).sum(dim=0, keepdim=True) / denom
 
         vec = vec / vec.norm(dim=-1, keepdim=True)
         vec = vec * weight
 
         return vec.unsqueeze(1)
+
+
+    def _encode_interp(left, right, t, weight):
+
+        tokens = tokenizer(
+            [left, right],
+            padding=True,
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt",
+        ).to(device)
+
+        with torch.no_grad():
+            out = text_encoder(
+                input_ids=tokens.input_ids,
+                attention_mask=tokens.attention_mask
+            ).last_hidden_state[:, 0, :]
+
+        left_vec = out[0]
+        right_vec = out[1]
+
+        vec = (1.0 - t) * left_vec + t * right_vec
+
+        norm = vec.norm().clamp_min(1e-8)
+        vec = vec / norm
+
+        vec = vec * weight
+
+        return vec.unsqueeze(0).unsqueeze(1)
+
 
     # ---------------------------------------------------------
     # Append synset embeddings
@@ -367,6 +457,33 @@ def _encode_subprompts_to_embeds(subprompts, tokenizer, text_encoder, device, ma
             prompt_embeds = torch.cat([prompt_embeds, syn_emb.to(device)], dim=1)
             syn_mask = torch.ones((1, 1), dtype=attention_mask.dtype, device=device)
             attention_mask = torch.cat([attention_mask, syn_mask], dim=1)
+
+    for text, weight in interp_items:
+
+        _, left, right, t = text.split("::")
+
+        interp_emb = _encode_interp(
+            left,
+            right,
+            float(t),
+            weight
+        )
+
+        prompt_embeds = torch.cat(
+            [prompt_embeds, interp_emb],
+            dim=1
+        )
+
+        interp_mask = torch.ones(
+            (1, 1),
+            dtype=attention_mask.dtype,
+            device=device
+        )
+
+        attention_mask = torch.cat(
+            [attention_mask, interp_mask],
+            dim=1
+        )
 
     return prompt_embeds.to(device), attention_mask.to(device)
 
