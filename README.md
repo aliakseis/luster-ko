@@ -1,7 +1,9 @@
 luster-ko
 =========
 
-luster-ko is a simple graphics editing program.
+luster-ko is a simple graphics editing program using Python scripts.
+
+<img width="652" height="570" alt="Image" src="https://github.com/user-attachments/assets/d43bc85f-790d-4427-85be-62d70f2bdd54" />
 
 Installing
 ----------
