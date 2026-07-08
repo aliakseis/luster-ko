@@ -134,6 +134,8 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
         });
         watcher->setFuture(future);
     }
+
+    setAcceptDrops(true);
 }
 
 MainWindow::~MainWindow()
@@ -195,6 +197,22 @@ ImageArea* MainWindow::initializeNewTab(bool openFile, bool askCanvasSize, const
     setCurrentFile(imageArea->getFilePath());
     
     return imageArea;
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->mimeData()->hasUrls())
+        event->acceptProposedAction();
+}
+
+void MainWindow::dropEvent(QDropEvent* event)
+{
+    const QList<QUrl> urls = event->mimeData()->urls();
+    for (const QUrl& url : urls) {
+        QString filePath = url.toLocalFile();
+        qDebug() << "Dropped file:" << filePath;
+        initializeNewTab(true, false, filePath);
+    }
 }
 
 void MainWindow::initializeMainMenu()
