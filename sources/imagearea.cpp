@@ -203,7 +203,7 @@ ImageArea::ImageArea(bool openFile, bool askCanvasSize, const QString &filePath,
     connect(selectionInstrument, SIGNAL(sendEnableSelectionInstrument(bool)), this, SIGNAL(sendEnableSelectionInstrument(bool)));
 
     // Instruments handlers
-    mInstrumentsHandlers.fill(0, (int)INSTRUMENTS_COUNT);
+    mInstrumentsHandlers.fill(nullptr, INSTRUMENTS_COUNT);
     mInstrumentsHandlers[CURSOR] = selectionInstrument;
     mInstrumentsHandlers[PEN] = new PencilInstrument(this);
     mInstrumentsHandlers[LINE] = new LineInstrument(this);
@@ -832,7 +832,7 @@ void ImageArea::clearSelection()
 
 void ImageArea::pushUndoCommand(UndoCommand *command)
 {
-    if(command != 0)
+    if(command != nullptr)
         mUndoStack->push(command);
 }
 
