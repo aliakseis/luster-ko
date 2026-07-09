@@ -639,14 +639,26 @@ void ImageArea::restoreCursor()
 
 bool ImageArea::setZoomFactor(qreal factor)
 {
-    auto zoomFactor = mZoomFactor * factor;
-    if (zoomFactor <= 0.25)
+    if (factor == 1.0)
+        return false;
+    const auto zoomFactor = mZoomFactor * factor;
+    if (setZoom(zoomFactor))
     {
-        if (mZoomFactor == 0.25)
+        emit zoomChanged();
+        return true;
+    }
+    return false;
+}
+
+bool ImageArea::setZoom(qreal zoomFactor)
+{
+    if (zoomFactor <= 0.125)
+    {
+        if (mZoomFactor == 0.125)
         {
             return false;
         }
-        mZoomFactor = 0.25;
+        mZoomFactor = 0.125;
     }
     else if (zoomFactor >= 8)
     {

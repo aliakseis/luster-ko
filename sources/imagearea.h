@@ -126,8 +126,9 @@ public:
      *
      * @param factor Scale factor
      */
+    bool setZoom(qreal zoom);
     bool setZoomFactor(qreal factor);
-    qreal getZoomFactor() { return mZoomFactor; }
+    qreal getZoomFactor() const { return mZoomFactor; }
     
     void fixSize(bool cleanUp = false);
     
@@ -250,6 +251,8 @@ signals:
      *
      */
     void sendEnableSelectionInstrument(bool enable);
+
+    void zoomChanged();
     
 private slots:
     void autoSave();

@@ -37,6 +37,7 @@ class QStatusBar;
 class QTabWidget;
 class QLabel;
 class QUndoGroup;
+class QSlider;
 QT_END_NAMESPACE
 
 class ToolBar;
@@ -103,6 +104,7 @@ private:
     ToolBar *mToolbar;
     PaletteBar *mPaletteBar;
     QLabel *mStatusLabel, *mSizeLabel, *mPosLabel, *mColorPreviewLabel, *mColorRGBLabel;
+    QSlider* scaleSlider = nullptr;
 
     QMap<InstrumentsEnum, QAction*> mInstrumentsActMap;
     QMap<int, QAction*> mEffectsActMap;

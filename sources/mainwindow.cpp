@@ -50,17 +50,20 @@
 #include <QFileInfo>
 #include <QtConcurrent>
 #include <QFontDatabase>
+#include <QSlider>
 
 #undef slots
 
 #include <Python.h>
 
-static QString strippedName(const QString& fullFileName)
+namespace {
+
+QString strippedName(const QString& fullFileName)
 {
     return QFileInfo(fullFileName).fileName();
 }
 
-static QString elideStatusText(const QString& text, int maxLen = 120)
+QString elideStatusText(const QString& text, int maxLen = 120)
 {
     if (text.size() <= maxLen)
         return text;
@@ -73,6 +76,22 @@ static QString elideStatusText(const QString& text, int maxLen = 120)
 
     return "..." + tail;
 }
+
+double sliderToScale(int slider)
+{
+    // slider 0..1000 -> exponent -3..+3
+    double x = (slider / 1000.0) * 6.0 - 3.0;
+    return std::exp2(x);   // 2^x
+}
+
+int scaleToSlider(double scale)
+{
+    double x = std::log2(scale);        // exponent
+    double slider = (x + 3.0) / 6.0 * 1000.0;
+    return int(std::clamp(slider, 0.0, 1000.0));
+}
+
+} // namespace
 
 MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
     : QMainWindow(parent), mPrevInstrumentSet(false)
@@ -96,6 +115,20 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
 
     initializeStatusBar();
     initializeTabWidget();
+
+    scaleSlider = new QSlider(Qt::Horizontal, this);
+    scaleSlider->setRange(0, 1000);
+    scaleSlider->setValue(500);   // 1.0x zoom midpoint
+    scaleSlider->setSingleStep(1);
+    scaleSlider->setPageStep(10);
+
+    // Put slider on the RIGHT side of the status bar
+    statusBar()->addPermanentWidget(scaleSlider);
+    connect(scaleSlider, &QSlider::valueChanged, this, [this](int value) {
+        if (auto area = getCurrentImageArea()) {
+            area->setZoom(sliderToScale(value));
+        }
+    });
 
     if(filePaths.isEmpty())
     {
@@ -192,6 +225,14 @@ ImageArea* MainWindow::initializeNewTab(bool openFile, bool askCanvasSize, const
     connect(imageArea, SIGNAL(sendColor(QColor)), this, SLOT(setCurrentPipetteColor(QColor)));
     connect(imageArea, SIGNAL(sendEnableCopyCutActions(bool)), this, SLOT(enableCopyCutActions(bool)));
     connect(imageArea, SIGNAL(sendEnableSelectionInstrument(bool)), this, SLOT(instumentsAct(bool)));
+    connect(imageArea, &ImageArea::zoomChanged, this, [this]() {
+        if (auto area = getCurrentImageArea()) {
+            double zoom = area->getZoomFactor();
+            scaleSlider->blockSignals(true);
+            scaleSlider->setValue(scaleToSlider(zoom));
+            scaleSlider->blockSignals(false);
+        }
+        });
 
     setWindowTitle(QString("%1 - luster-ko").arg(fileName));
     setCurrentFile(imageArea->getFilePath());
@@ -503,7 +544,7 @@ ImageArea* MainWindow::getCurrentImageArea()
         ImageArea *tempArea = qobject_cast<ImageArea*>(tempScrollArea->widget());
         return tempArea;
     }
-    return NULL;
+    return nullptr;
 }
 
 ImageArea* MainWindow::getImageAreaByIndex(int index)
@@ -531,6 +572,12 @@ void MainWindow::activateTab(const int &index)
         setWindowTitle(QString("%1 - luster-ko").arg(tr("Untitled Image")));
     }
     mUndoStackGroup->setActiveStack(getCurrentImageArea()->getUndoStack());
+
+    if (auto area = getCurrentImageArea()) {
+        scaleSlider->blockSignals(true);
+        scaleSlider->setValue(scaleToSlider(area->getZoomFactor()));
+        scaleSlider->blockSignals(false);
+    }
 }
 
 void MainWindow::setNewSizeToSizeLabel(const QSize &size)
