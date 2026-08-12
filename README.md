@@ -881,3 +881,5 @@ Enable Instruments -> Markup mode to use markup:
 ![image](luster-ko_demo2.jpg)
 
 ![image](luster-ko_demo.jpg)
+
+Tiny demo here: https://youtu.be/sSmi0-Eg7XY
