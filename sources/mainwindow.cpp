@@ -297,9 +297,9 @@ void MainWindow::initializeMainMenu()
             this, SLOT(openRecentFile()));
     }
 
-    separatorAct = mFileMenu->addSeparator();
+    mRecentMenu = mFileMenu->addMenu(tr("Recent Files"));
     for (int i = 0; i < MaxRecentFiles; ++i)
-        mFileMenu->addAction(recentFileActs[i]);
+        mRecentMenu->addAction(recentFileActs[i]);
 
     updateRecentFileActions();
 
@@ -1024,7 +1024,7 @@ void MainWindow::updateRecentFileActions()
     for (int j = numRecentFiles; j < MaxRecentFiles; ++j)
         recentFileActs[j]->setVisible(false);
 
-    separatorAct->setVisible(numRecentFiles > 0);
+    mRecentMenu->menuAction()->setVisible(numRecentFiles > 0);
 }
 
 void MainWindow::openRecentFile()

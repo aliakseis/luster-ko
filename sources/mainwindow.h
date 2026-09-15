@@ -108,10 +108,11 @@ private:
 
     QMap<InstrumentsEnum, QAction*> mInstrumentsActMap;
     QMap<int, QAction*> mEffectsActMap;
-    QAction *mSaveAction, *mSaveAsAction, *mCloseAction, *separatorAct, *mPrintAction,
+    QAction *mSaveAction, *mSaveAsAction, *mCloseAction, *mPrintAction,
             *mUndoAction, *mRedoAction, *mCopyAction, *mCutAction, *mMarkupModeAction,
             *mNewAction, *mOpenAction, *mExitAction, *mPasteAction, *mZoomInAction, *mZoomOutAction;
     QMenu *mFileMenu, *mInstrumentsMenu, *mEffectsMenu, *mToolsMenu;
+    QMenu* mRecentMenu;
     QUndoGroup *mUndoStackGroup;
     bool mPrevInstrumentSet; /**< Used for magnifier */
 
