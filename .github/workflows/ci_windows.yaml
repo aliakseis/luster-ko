@@ -38,9 +38,8 @@ jobs:
           persist-credentials: false
           submodules: true
 
-      # Use current vcpkg release/registry.
-      # Python 3.11 is selected below through vcpkg manifest version override.
-      - name: Checkout vcpkg
+      # Pin vcpkg to the revision used by vcpkg.json
+      - name: Checkout vcpkg revision (Python 3.11)
         run: |
           cd ${{ env.vcpkg_path }}
           git fetch --all
@@ -63,12 +62,6 @@ jobs:
             core.exportVariable('ACTIONS_CACHE_URL', (process.env.ACTIONS_CACHE_URL || ''));
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', (process.env.ACTIONS_RUNTIME_TOKEN || ''));
 
-      # ----------------------------------------------------------------------
-      # Only change needed to select Python 3.11.
-      #
-      # vcpkg manifest mode lets us keep the current vcpkg registry while
-      # forcing python3 to exactly 3.11.11.
-      # ----------------------------------------------------------------------
       - name: Install dependencies with vcpkg
         run: |
           New-Item `
@@ -83,16 +76,13 @@ jobs:
               "set(VCPKG_CRT_LINKAGE dynamic)",
               "set(VCPKG_BUILD_TYPE release)")
 
-          $packages = `
-            "zlib:${{ matrix.vcpkg_triplet }}",
-            "python3:${{ matrix.vcpkg_triplet }}",
-            "pybind11:${{ matrix.vcpkg_triplet }}"
+          $env:VCPKG_ROOT = "${{ env.vcpkg_path }}"
 
-          ${{ env.vcpkg_path }}/vcpkg.exe install `
-            --binarysource="clear;x-gha,readwrite" `
-            --clean-after-build `
+          & "${{ env.vcpkg_path }}/vcpkg.exe" install `
+            --triplet="${{ matrix.vcpkg_triplet }}" `
             --overlay-triplets="${{ env.vcpkg_path }}/triplets_overlay" `
-            $packages
+            --binarysource="clear;x-gha,readwrite" `
+            --clean-after-build
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
