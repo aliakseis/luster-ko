@@ -70,7 +70,6 @@ jobs:
       # forcing python3 to exactly 3.11.11.
       # ----------------------------------------------------------------------
       - name: Install dependencies with vcpkg
-        working-directory: ${{ github.workspace }}
         run: |
           New-Item `
             -Force `
@@ -84,29 +83,16 @@ jobs:
               "set(VCPKG_CRT_LINKAGE dynamic)",
               "set(VCPKG_BUILD_TYPE release)")
 
-          @"
-          {
-            "name": "luster-ko",
-            "version-string": "1.0.0",
-            "builtin-baseline": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
-            "dependencies": [
-              "python3",
-              "pybind11"
-            ],
-            "overrides": [
-              {
-                "name": "python3",
-                "version": "3.11.11"
-              }
-            ]
-          }
-          "@ | Set-Content -Encoding UTF8 "${{ github.workspace }}/vcpkg.json"
+          $packages = `
+            "zlib:${{ matrix.vcpkg_triplet }}",
+            "python3:${{ matrix.vcpkg_triplet }}",
+            "pybind11:${{ matrix.vcpkg_triplet }}"
 
-          & "${{ env.vcpkg_path }}/vcpkg.exe" install `
-            --triplet="${{ matrix.vcpkg_triplet }}" `
-            --overlay-triplets="${{ env.vcpkg_path }}/triplets_overlay" `
+          ${{ env.vcpkg_path }}/vcpkg.exe install `
             --binarysource="clear;x-gha,readwrite" `
-            --clean-after-build
+            --clean-after-build `
+            --overlay-triplets="${{ env.vcpkg_path }}/triplets_overlay" `
+            $packages
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
