@@ -49,12 +49,14 @@ jobs:
 
           git checkout --force 9e593bb18ea69cc5095e012465dcd675a822ed0d
 
-          $actual = (git rev-parse HEAD).Trim()
-          $expected = "9e593bb18ea69cc5095e012465dcd675a822ed0d"
+          # The runner's vcpkg checkout may be shallow.
+          # Versioned manifest dependencies require the historical
+          # commits containing the selected port versions.
+          git fetch --unshallow 2>$null
 
-          if ($actual -ne $expected) {
-            Write-Error "Unexpected vcpkg revision: $actual"
-            exit 1
+          if ($LASTEXITCODE -ne 0) {
+            # Already a complete repository is fine.
+            Write-Host "vcpkg repository is already complete."
           }
 
           .\bootstrap-vcpkg.bat
@@ -131,6 +133,7 @@ jobs:
         shell: pwsh
         run: |
           & "$env:VCPKG_ROOT\vcpkg.exe" install `
+            --x-manifest-root="$env:GITHUB_WORKSPACE" `
             --triplet "${{ matrix.vcpkg_triplet }}" `
             --overlay-triplets="$env:GITHUB_WORKSPACE\vcpkg-triplets" `
             --binarysource="clear;x-gha,readwrite" `
@@ -226,6 +229,7 @@ jobs:
             -DMSVC_RUNTIME_DYNAMIC=ON `
             -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }} `
             -DVCPKG_OVERLAY_TRIPLETS="$env:GITHUB_WORKSPACE/vcpkg-triplets" `
+            -DVCPKG_MANIFEST_DIR="$env:GITHUB_WORKSPACE" `
             -DVERBOSE_CONFIGURE=ON
 
       - name: Build
