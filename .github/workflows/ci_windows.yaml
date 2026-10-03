@@ -12,7 +12,6 @@ concurrency:
 jobs:
   build:
     runs-on: windows-2022
-
     permissions:
       actions: write
 
@@ -20,13 +19,17 @@ jobs:
       matrix:
         platform: [x64]
         include:
+        #  - platform: x86
+        #    arch: Win32
+        #    qt_arch: win32_msvc2019
+        #    vcpkg_triplet: x86-windows-md-release
           - platform: x64
             arch: x64
             qt_arch: win64_msvc2019_64
             vcpkg_triplet: x64-windows-md-release
 
     env:
-      VCPKG_ROOT: C:/vcpkg
+      vcpkg_path: "c:/vcpkg"
 
     steps:
       - name: Checkout repository
@@ -35,175 +38,75 @@ jobs:
           persist-credentials: false
           submodules: true
 
-      # ----------------------------------------------------------------------
-      # Pin vcpkg to the current official immutable release.
-      #
-      # This is NOT the old Python-3.11 vcpkg revision.
-      # ----------------------------------------------------------------------
-      - name: Setup vcpkg
-        shell: pwsh
+      # Use current vcpkg release/registry.
+      # Python 3.11 is selected below through vcpkg manifest version override.
+      - name: Checkout vcpkg
         run: |
-          Set-Location $env:VCPKG_ROOT
+          cd ${{ env.vcpkg_path }}
+          git fetch --all
+          git checkout 9e593bb18ea69cc5095e012465dcd675a822ed0d
 
-          git fetch --all --tags --prune
-
-          git checkout --force 9e593bb18ea69cc5095e012465dcd675a822ed0d
-
-          # The runner's vcpkg checkout may be shallow.
-          # Versioned manifest dependencies require the historical
-          # commits containing the selected port versions.
-          git fetch --unshallow 2>$null
-
-          if ($LASTEXITCODE -ne 0) {
-            # Already a complete repository is fine.
-            Write-Host "vcpkg repository is already complete."
-          }
-
-          .\bootstrap-vcpkg.bat
-
-          .\vcpkg.exe version
-
-      - name: Setup MSVC
+      - name: Setup devcmd
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install build tools
-        shell: pwsh
         run: |
-          if (-not (Get-Command ninja.exe -ErrorAction SilentlyContinue)) {
-            choco install ninja -y
+          if ((Get-Command "ninja.exe" -ErrorAction SilentlyContinue) -eq $null) {
+             choco install ninja
           }
-
           ninja --version
 
-      # ----------------------------------------------------------------------
-      # GitHub Actions cache support for vcpkg.
-      # ----------------------------------------------------------------------
-      - name: Configure vcpkg GitHub Actions cache
+      - name: Set variables for vcpkg
         uses: actions/github-script@v7
         with:
           script: |
-            core.exportVariable(
-              'ACTIONS_CACHE_URL',
-              process.env.ACTIONS_CACHE_URL || ''
-            );
-
-            core.exportVariable(
-              'ACTIONS_RUNTIME_TOKEN',
-              process.env.ACTIONS_RUNTIME_TOKEN || ''
-            );
+            core.exportVariable('ACTIONS_CACHE_URL', (process.env.ACTIONS_CACHE_URL || ''));
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', (process.env.ACTIONS_RUNTIME_TOKEN || ''));
 
       # ----------------------------------------------------------------------
-      # Custom x64 / dynamic CRT / dynamic library triplet.
-      # ----------------------------------------------------------------------
-      - name: Configure vcpkg triplet
-        shell: pwsh
-        run: |
-          $overlay = Join-Path `
-            $env:GITHUB_WORKSPACE `
-            "vcpkg-triplets"
-
-          New-Item `
-            -ItemType Directory `
-            -Force `
-            -Path $overlay | Out-Null
-
-          $triplet = Join-Path `
-            $overlay `
-            "${{ matrix.vcpkg_triplet }}.cmake"
-
-          @(
-            "set(VCPKG_TARGET_ARCHITECTURE x64)"
-            "set(VCPKG_LIBRARY_LINKAGE dynamic)"
-            "set(VCPKG_CRT_LINKAGE dynamic)"
-            "set(VCPKG_BUILD_TYPE release)"
-          ) | Set-Content `
-            -Encoding ASCII `
-            -Path $triplet
-
-          Write-Host "Triplet:"
-          Get-Content $triplet
-
-      # ----------------------------------------------------------------------
-      # Manifest-mode install.
+      # Only change needed to select Python 3.11.
       #
-      # vcpkg.json pins Python 3.11.11.
-      # Everything else comes from the current vcpkg baseline.
+      # vcpkg manifest mode lets us keep the current vcpkg registry while
+      # forcing python3 to exactly 3.11.11.
       # ----------------------------------------------------------------------
       - name: Install dependencies with vcpkg
-        shell: pwsh
+        working-directory: ${{ github.workspace }}
         run: |
-          & "$env:VCPKG_ROOT\vcpkg.exe" install `
-            --x-manifest-root="$env:GITHUB_WORKSPACE" `
-            --triplet "${{ matrix.vcpkg_triplet }}" `
-            --overlay-triplets="$env:GITHUB_WORKSPACE\vcpkg-triplets" `
+          New-Item `
+            -Force `
+            -ItemType File `
+            -Path "${{ env.vcpkg_path }}/triplets_overlay/${{ matrix.vcpkg_triplet }}.cmake"
+
+          Add-Content `
+            -Path "${{ env.vcpkg_path }}/triplets_overlay/${{ matrix.vcpkg_triplet }}.cmake" `
+            -Value @("set(VCPKG_TARGET_ARCHITECTURE ${{ matrix.platform }})",
+              "set(VCPKG_LIBRARY_LINKAGE dynamic)",
+              "set(VCPKG_CRT_LINKAGE dynamic)",
+              "set(VCPKG_BUILD_TYPE release)")
+
+          @"
+          {
+            "name": "luster-ko",
+            "version-string": "1.0.0",
+            "builtin-baseline": "9e593bb18ea69cc5095e012465dcd675a822ed0d",
+            "dependencies": [
+              "python3",
+              "pybind11"
+            ],
+            "overrides": [
+              {
+                "name": "python3",
+                "version": "3.11.11"
+              }
+            ]
+          }
+          "@ | Set-Content -Encoding UTF8 "${{ github.workspace }}/vcpkg.json"
+
+          & "${{ env.vcpkg_path }}/vcpkg.exe" install `
+            --triplet="${{ matrix.vcpkg_triplet }}" `
+            --overlay-triplets="${{ env.vcpkg_path }}/triplets_overlay" `
             --binarysource="clear;x-gha,readwrite" `
             --clean-after-build
-
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-      # ----------------------------------------------------------------------
-      # Verify that the Python installed by vcpkg is really 3.11.
-      # ----------------------------------------------------------------------
-      - name: Verify Python 3.11
-        shell: pwsh
-        run: |
-          $python = Join-Path `
-            $env:GITHUB_WORKSPACE `
-            "vcpkg_installed\${{ matrix.vcpkg_triplet }}\tools\python3\python.exe"
-
-          if (-not (Test-Path $python)) {
-            Write-Error "Python executable was not installed by vcpkg:"
-            Write-Error $python
-            exit 1
-          }
-
-          Write-Host "Python executable:"
-          Write-Host $python
-
-          & $python --version
-
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
-
-          $version = (
-            & $python -c `
-              "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}')"
-          ).Trim()
-
-          Write-Host "Detected Python: $version"
-
-          if ($version -ne "3.11.11") {
-            Write-Error "Expected Python 3.11.11, got $version"
-            exit 1
-          }
-
-      # ----------------------------------------------------------------------
-      # Verify pybind11 is present in the same vcpkg installation.
-      # ----------------------------------------------------------------------
-      - name: Verify pybind11
-        shell: pwsh
-        run: |
-          $prefix = Join-Path `
-            $env:GITHUB_WORKSPACE `
-            "vcpkg_installed\${{ matrix.vcpkg_triplet }}"
-
-          $config = Get-ChildItem `
-            $prefix `
-            -Recurse `
-            -Filter "pybind11Config.cmake" `
-            -ErrorAction SilentlyContinue |
-            Select-Object -First 1
-
-          if ($null -eq $config) {
-            Write-Error "pybind11Config.cmake was not found."
-            exit 1
-          }
-
-          Write-Host "pybind11:"
-          Write-Host $config.FullName
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -213,11 +116,7 @@ jobs:
           archives: qtbase qtquickcontrols2 qtdeclarative qttools d3dcompiler_47
           cache: true
 
-      # ----------------------------------------------------------------------
-      # CMake configure.
-      # ----------------------------------------------------------------------
-      - name: Configure
-        shell: pwsh
+      - name: Build luster-ko
         run: |
           cmake `
             -B build `
@@ -225,30 +124,16 @@ jobs:
             -A ${{ matrix.arch }} `
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON `
-            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DCMAKE_TOOLCHAIN_FILE="${{ env.vcpkg_path }}/scripts/buildsystems/vcpkg.cmake" `
             -DMSVC_RUNTIME_DYNAMIC=ON `
             -DVCPKG_TARGET_TRIPLET=${{ matrix.vcpkg_triplet }} `
-            -DVCPKG_OVERLAY_TRIPLETS="$env:GITHUB_WORKSPACE/vcpkg-triplets" `
-            -DVCPKG_MANIFEST_DIR="$env:GITHUB_WORKSPACE" `
             -DVERBOSE_CONFIGURE=ON
 
-      - name: Build
-        shell: pwsh
-        run: |
-          cmake `
-            --build build `
-            --config RelWithDebInfo `
-            --parallel
-
-      - name: Install
-        shell: pwsh
-        run: |
-          cmake `
-            --install build `
-            --config RelWithDebInfo
+          cmake --build build --config RelWithDebInfo
+          cmake --install build --config RelWithDebInfo
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-artifacts-${{ matrix.platform }}
+          name: build-artifacts-${{matrix.platform}}
           path: ./build/bin
