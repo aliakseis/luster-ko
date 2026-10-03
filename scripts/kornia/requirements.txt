@@ -1,0 +1,5 @@
+# Dependencies for scripts/kornia/kornia.py
+# PyTorch will use CUDA automatically when a CUDA-enabled build is installed.
+numpy>=1.24
+kornia>=0.7
+torch>=2.0

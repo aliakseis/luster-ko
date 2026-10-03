@@ -627,6 +627,23 @@ void ScriptModelImpl::loadScript(ScriptModel* model, const QString& path)
             py::object sig = inspect.attr("signature")(obj);
             info.signature = QString::fromStdString(py::str(sig).cast<std::string>());
 
+            // Resolve annotations with typing.get_type_hints().  This is
+            // important for scripts using ``from __future__ import annotations``:
+            // inspect.Parameter.annotation may otherwise contain a string
+            // instead of the actual Python type object.
+            py::object resolvedTypeHints = py::dict();
+            try
+            {
+                py::module_ typing = py::module_::import("typing");
+                resolvedTypeHints = typing.attr("get_type_hints")(obj);
+            }
+            catch (const py::error_already_set&)
+            {
+                // Keep loading the script even if one annotation cannot be
+                // resolved (for example an optional third-party type).
+                PyErr_Clear();
+            }
+
             py::object docObj = inspect.attr("getdoc")(obj);
             std::string docStr = docObj.is_none() ? std::string() : py::str(docObj).cast<std::string>();
             info.doc = QString::fromStdString(docStr);
@@ -650,9 +667,31 @@ void ScriptModelImpl::loadScript(ScriptModel* model, const QString& path)
                     param.defaultValue = QString::fromStdString(py::str(def).cast<std::string>());
                 }
 
+                // Prefer the resolved annotation.  For a normal type this
+                // produces the same representation as before, e.g.
+                // "<class 'float'>" or "<class 'numpy.ndarray'>", while
+                // also correctly resolving postponed/string annotations.
                 py::object ann = paramObj.attr("annotation");
-                if (ann.ptr() != param_empty.ptr()) {
-                    param.annotation = QString::fromStdString(py::str(ann).cast<std::string>());
+                py::object resolvedAnn = param_empty;
+
+                if (py::isinstance<py::dict>(resolvedTypeHints))
+                {
+                    py::dict hints = resolvedTypeHints.cast<py::dict>();
+                    py::object key = py::str(paramName);
+                    if (hints.contains(key))
+                        resolvedAnn = hints[key];
+                }
+
+                if (resolvedAnn.ptr() != param_empty.ptr())
+                {
+                    param.annotation = QString::fromStdString(
+                        py::str(resolvedAnn).cast<std::string>());
+                }
+                else if (ann.ptr() != param_empty.ptr())
+                {
+                    // Safe fallback if get_type_hints() could not resolve it.
+                    param.annotation = QString::fromStdString(
+                        py::str(ann).cast<std::string>());
                 }
 
                 QString qParamName = QString::fromStdString(paramName);
