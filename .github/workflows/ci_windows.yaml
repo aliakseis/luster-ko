@@ -47,16 +47,10 @@ jobs:
       # ----------------------------------------------------------------------
       # Python 3.11
       #
-      # This replaces the old vcpkg Python 3.11 package.
-      # setup-python supplies:
+      # Keep the exact Python installation selected by setup-python.
       #
-      #   python.exe
-      #   python311.dll
-      #   Include/
-      #   Lib/
-      #   libs/python311.lib
-      #
-      # CMake deploys python311.dll into the final application directory.
+      # Some later actions can modify the global Python environment/PATH.
+      # Therefore we must NOT rely on "python" after those actions.
       # ----------------------------------------------------------------------
 
       - name: Setup Python 3.11
@@ -66,31 +60,70 @@ jobs:
           architecture: "x64"
           cache: "pip"
 
+      - name: Save Python 3.11 environment
+        shell: pwsh
+        run: |
+          $pythonHome = python -c "import sys; print(sys.prefix)"
+          $pythonExe  = python -c "import sys; print(sys.executable)"
+
+          Write-Host "Python home:"
+          Write-Host $pythonHome
+
+          Write-Host "Python executable:"
+          Write-Host $pythonExe
+
+          if (!(Test-Path $pythonExe)) {
+            throw "Python executable does not exist: $pythonExe"
+          }
+
+          # Keep this in a custom variable. The Qt action may modify
+          # pythonLocation/Python_ROOT_DIR later.
+          "LUSTER_PYTHON_HOME=$pythonHome" | Out-File `
+            -FilePath $env:GITHUB_ENV `
+            -Encoding utf8 `
+            -Append
+
+          "LUSTER_PYTHON_EXE=$pythonExe" | Out-File `
+            -FilePath $env:GITHUB_ENV `
+            -Encoding utf8 `
+            -Append
+
       - name: Install Python build dependencies
         shell: pwsh
         run: |
-          python --version
-          python -m pip --version
-          python -m pip install --upgrade pip
-          python -m pip install pybind11
+          & "$env:LUSTER_PYTHON_EXE" --version
+          & "$env:LUSTER_PYTHON_EXE" -m pip --version
+
+          & "$env:LUSTER_PYTHON_EXE" -m pip install --upgrade pip
+          & "$env:LUSTER_PYTHON_EXE" -m pip install pybind11
 
       - name: Verify Python development files
         shell: pwsh
         run: |
-          Write-Host "Python:"
-          python --version
+          Write-Host "Python executable:"
+          Write-Host $env:LUSTER_PYTHON_EXE
 
           Write-Host ""
-          Write-Host "Python executable:"
-          python -c "import sys; print(sys.executable)"
+          Write-Host "Python version:"
+          & "$env:LUSTER_PYTHON_EXE" --version
 
           Write-Host ""
           Write-Host "Python prefix:"
-          python -c "import sys; print(sys.prefix)"
+          & "$env:LUSTER_PYTHON_EXE" -c "import sys; print(sys.prefix)"
 
           Write-Host ""
           Write-Host "pybind11 CMake directory:"
-          python -m pybind11 --cmakedir
+          $pybind11CMakeDir = & "$env:LUSTER_PYTHON_EXE" -m pybind11 --cmakedir
+          Write-Host $pybind11CMakeDir
+
+          if (!(Test-Path $pybind11CMakeDir)) {
+            throw "pybind11 CMake directory does not exist: $pybind11CMakeDir"
+          }
+
+          "LUSTER_PYBIND11_CMAKE_DIR=$pybind11CMakeDir" | Out-File `
+            -FilePath $env:GITHUB_ENV `
+            -Encoding utf8 `
+            -Append
 
       # ----------------------------------------------------------------------
       # Ninja
@@ -118,26 +151,79 @@ jobs:
           cache: true
 
       # ----------------------------------------------------------------------
+      # Verify that Qt did not change the Python installation we intend to use.
+      #
+      # Do not use "python" here. The Qt action may have changed it.
+      # ----------------------------------------------------------------------
+
+      - name: Verify pinned Python after Qt setup
+        shell: pwsh
+        run: |
+          Write-Host "Pinned Python executable:"
+          Write-Host $env:LUSTER_PYTHON_EXE
+
+          Write-Host ""
+          Write-Host "Pinned Python version:"
+          & "$env:LUSTER_PYTHON_EXE" --version
+
+          Write-Host ""
+          Write-Host "Pinned Python prefix:"
+          & "$env:LUSTER_PYTHON_EXE" -c "import sys; print(sys.prefix)"
+
+          Write-Host ""
+          Write-Host "Pinned Python pybind11:"
+          & "$env:LUSTER_PYTHON_EXE" -m pybind11 --cmakedir
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "pybind11 is not available in the pinned Python 3.11 environment."
+          }
+
+      # ----------------------------------------------------------------------
       # Configure / build / install
       #
       # No vcpkg toolchain is supplied here.
       #
-      # CMake therefore enters the non-vcpkg deployment path:
-      #
-      #   - Python DLL is installed explicitly
-      #   - MSVC/UCRT runtime is installed
-      #   - windeployqt deploys Qt
-      #
-      # pybind11 is found through the CMake directory installed by pip.
+      # Python is explicitly pinned to the Python installation selected by
+      # setup-python, regardless of changes made by install-qt-action.
       # ----------------------------------------------------------------------
 
       - name: Configure luster-ko
         shell: pwsh
         run: |
-          $pybind11CMakeDir = python -m pybind11 --cmakedir
+          $pythonExe = $env:LUSTER_PYTHON_EXE
+          $pythonHome = $env:LUSTER_PYTHON_HOME
+          $pybind11CMakeDir = $env:LUSTER_PYBIND11_CMAKE_DIR
 
+          Write-Host "========================================"
+          Write-Host "Python configuration"
+          Write-Host "========================================"
+          Write-Host "Python home:"
+          Write-Host $pythonHome
+
+          Write-Host ""
+          Write-Host "Python executable:"
+          Write-Host $pythonExe
+
+          Write-Host ""
+          Write-Host "Python version:"
+          & $pythonExe --version
+
+          Write-Host ""
           Write-Host "pybind11 CMake directory:"
           Write-Host $pybind11CMakeDir
+
+          if (!(Test-Path $pythonExe)) {
+            throw "Python executable not found: $pythonExe"
+          }
+
+          if (!(Test-Path $pybind11CMakeDir)) {
+            throw "pybind11 CMake directory not found: $pybind11CMakeDir"
+          }
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "CMake configure"
+          Write-Host "========================================"
 
           cmake `
             -B build `
@@ -146,6 +232,8 @@ jobs:
             -DCMAKE_BUILD_TYPE=RelWithDebInfo `
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON `
             -DCMAKE_PREFIX_PATH="$pybind11CMakeDir" `
+            -DPython3_EXECUTABLE="$pythonExe" `
+            -DPython3_ROOT_DIR="$pythonHome" `
             -DMSVC_RUNTIME_DYNAMIC=ON `
             -DVERBOSE_CONFIGURE=ON
 
