@@ -32,6 +32,7 @@
 #include <QPushButton>
 
 QT_BEGIN_NAMESPACE
+class QSlider;
 class QToolButton;
 class ColorChooser;
 QT_END_NAMESPACE
@@ -48,6 +49,7 @@ public:
     explicit ToolBar(const QMap<InstrumentsEnum, QAction*> &actMap, QWidget *parent = 0);
 
     QPushButton* mMarkupButton{};
+    QSlider* mMarkupTransparencySlider{};
 
 private:
     /**
@@ -74,6 +76,7 @@ private:
 signals:
     void sendClearStatusBarColor();
     void sendClearImageSelection();
+    void markupTransparencyChanged(int value);
 
 public slots:
     void setPrimaryColorView();
@@ -83,6 +86,7 @@ private slots:
     void penValueChanged(const int &value);
     void primaryColorChanged(const QColor &color);
     void secondaryColorChanged(const QColor &color);
+    void markupTransparencyValueChanged(int value);
 
 protected:
     void contextMenuEvent(QContextMenuEvent *);

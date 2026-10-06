@@ -532,15 +532,24 @@ void ImageArea::paintEvent(QPaintEvent *event)
         painter.scale(mZoomFactor, mZoomFactor);
         painter.drawImage(QPoint(0, 0), mImage);
 
-        assert(mMarkup.format() == QImage::Format_Grayscale8);
+        const int markupTransparency =
+            DataSingleton::Instance()->getMarkupTransparency();
 
-        QImage primary(mMarkup.size(), QImage::Format_Mono);
-        QImage secondary(mMarkup.size(), QImage::Format_Mono);
+        // Transparency affects only how the markup is displayed. The
+        // underlying grayscale markup image remains unchanged, so scripts,
+        // effects, undo/redo and markup editing continue to use the original
+        // markup data.
+        if (markupTransparency < 100)
+        {
+            assert(mMarkup.format() == QImage::Format_Grayscale8);
 
-        primary.fill(Qt::color0);
-        secondary.fill(Qt::color0);
+            QImage primary(mMarkup.size(), QImage::Format_Mono);
+            QImage secondary(mMarkup.size(), QImage::Format_Mono);
 
-        // Build masks
+            primary.fill(Qt::color0);
+            secondary.fill(Qt::color0);
+
+            // Build masks
         for (int y = 0; y < mMarkup.height(); ++y)
         {
             const uchar* src = mMarkup.constScanLine(y);
@@ -562,9 +571,11 @@ void ImageArea::paintEvent(QPaintEvent *event)
             }
         }
 
-        {
-            // Convert monochrome mask to a QBitmap and then QRegion:
-            QBitmap bitmapMask = QBitmap::fromImage(primary);
+            painter.setOpacity(1.0 - markupTransparency / 100.0);
+
+            {
+                // Convert monochrome mask to a QBitmap and then QRegion:
+                QBitmap bitmapMask = QBitmap::fromImage(primary);
             QRegion clipRegion(bitmapMask);
 
             painter.setClipRegion(clipRegion);
@@ -572,14 +583,15 @@ void ImageArea::paintEvent(QPaintEvent *event)
             painter.fillRect(mImage.rect(), DataSingleton::Instance()->getPrimaryColor());
         }
 
-        {
-            // Convert monochrome mask to a QBitmap and then QRegion:
-            QBitmap bitmapMask = QBitmap::fromImage(secondary);
-            QRegion clipRegion(bitmapMask);
+            {
+                // Convert monochrome mask to a QBitmap and then QRegion:
+                QBitmap bitmapMask = QBitmap::fromImage(secondary);
+                QRegion clipRegion(bitmapMask);
 
-            painter.setClipRegion(clipRegion);
+                painter.setClipRegion(clipRegion);
 
-            painter.fillRect(mImage.rect(), DataSingleton::Instance()->getSecondaryColor());
+                painter.fillRect(mImage.rect(), DataSingleton::Instance()->getSecondaryColor());
+            }
         }
 
         painter.restore();

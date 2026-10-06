@@ -112,6 +112,8 @@ MainWindow::MainWindow(QStringList filePaths, QWidget *parent)
     connect(mToolbar->mMarkupButton, &QToolButton::toggled, this, &MainWindow::onMarkupMode);
     connect(mToolbar->mMarkupButton, &QToolButton::toggled, mMarkupModeAction, &QAction::setChecked);
     connect(mMarkupModeAction, &QAction::toggled, mToolbar->mMarkupButton, &QToolButton::setChecked);
+    connect(mToolbar, &ToolBar::markupTransparencyChanged,
+            this, &MainWindow::onMarkupTransparencyChanged);
 
     initializeStatusBar();
     initializeTabWidget();
@@ -898,6 +900,14 @@ void MainWindow::onTransparentSecondaryColor()
 void MainWindow::onMarkupMode(bool state)
 {
     DataSingleton::Instance()->setMarkupMode(state);
+}
+
+void MainWindow::onMarkupTransparencyChanged(int value)
+{
+    Q_UNUSED(value);
+
+    if (ImageArea* imageArea = getCurrentImageArea())
+        imageArea->update();
 }
 
 void MainWindow::enableActions(int index)

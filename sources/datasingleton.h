@@ -116,6 +116,9 @@ public:
     void setMarkupMode(bool b) { mMarkupMode = b; }
     bool isMarkupMode() { return mMarkupMode; }
 
+    void setMarkupTransparency(int value) { mMarkupTransparency = qBound(0, value, 100); }
+    int getMarkupTransparency() const { return mMarkupTransparency; }
+
     void readSetting();
     void writeSettings();
     void readState();
@@ -142,6 +145,7 @@ private:
 
     bool mIsResetCurve; /**< Needs to correct work of Bezier curve instrument */
     bool mMarkupMode = false;
+    int mMarkupTransparency = 0;
     int mAutoSaveInterval, mHistoryDepth;
     QString mAppLanguage;
     QString mLastFilePath; /* last opened file */

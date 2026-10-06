@@ -30,6 +30,7 @@
 #include <QToolButton>
 #include <QGridLayout>
 #include <QSpinBox>
+#include <QSlider>
 #include <QAction>
 #include <QtCore/QMap>
 
@@ -117,7 +118,21 @@ void ToolBar::initializeItems()
 
     mMarkupButton = new QPushButton(tr("Markup"));
     mMarkupButton->setCheckable(true);
+    mMarkupButton->setStatusTip(tr("Markup mode"));
+    mMarkupButton->setToolTip(tr("Markup mode"));
     bLayout->addWidget(mMarkupButton, 8, 0, 1, 2);
+
+    mMarkupTransparencySlider = new QSlider(Qt::Horizontal);
+    mMarkupTransparencySlider->setRange(0, 100);
+    mMarkupTransparencySlider->setValue(DataSingleton::Instance()->getMarkupTransparency());
+    mMarkupTransparencySlider->setSingleStep(1);
+    mMarkupTransparencySlider->setPageStep(10);
+    mMarkupTransparencySlider->setFixedHeight(18);
+    mMarkupTransparencySlider->setStatusTip(tr("Markup transparency"));
+    mMarkupTransparencySlider->setToolTip(tr("Markup transparency"));
+    connect(mMarkupTransparencySlider, &QSlider::valueChanged,
+            this, &ToolBar::markupTransparencyValueChanged);
+    bLayout->addWidget(mMarkupTransparencySlider, 9, 0, 1, 2);
 
     //QWidget *tWidget = new QWidget();
     //tWidget->setLayout(tLayout);
@@ -140,6 +155,12 @@ void ToolBar::primaryColorChanged(const QColor &color)
 void ToolBar::secondaryColorChanged(const QColor &color)
 {
     DataSingleton::Instance()->setSecondaryColor(color);
+}
+
+void ToolBar::markupTransparencyValueChanged(int value)
+{
+    DataSingleton::Instance()->setMarkupTransparency(value);
+    emit markupTransparencyChanged(value);
 }
 
 void ToolBar::setPrimaryColorView()

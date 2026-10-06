@@ -161,6 +161,7 @@ private slots:
     void onTransparentPrimaryColor();
     void onTransparentSecondaryColor();
     void onMarkupMode(bool state);
+    void onMarkupTransparencyChanged(int value);
     void enableActions(int index);
     void enableCopyCutActions(bool enable);
     void clearImageSelection();
