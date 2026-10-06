@@ -1,7 +1,6 @@
 ﻿#include "ScriptModel.h"
 
 #include "datasingleton.h"
-#include "makeguard.h"
 
 #include "effects/scripteffect.h"
 #include "effects/scripteffectwithsettings.h"

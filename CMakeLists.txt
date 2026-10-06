@@ -48,7 +48,6 @@ set(HEADERS
     sources/effects/scripteffect.h
     sources/effects/scripteffectwithsettings.h
     sources/effects/sharpeneffect.h
-    sources/makeguard.h
     sources/qtsingleapplication/qtlocalpeer.h
     sources/qtsingleapplication/qtsingleapplication.h
     sources/qtsingleapplication/qtsinglecoreapplication.h
