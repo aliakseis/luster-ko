@@ -1,3 +1,5 @@
+#pragma once
+
 /*
  * This source file is part of luster-ko.
  *
@@ -23,9 +25,6 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef DATASINGLETON_H
-#define DATASINGLETON_H
-
 #include <QColor>
 #include <QtCore/QSize>
 #include <QtCore/QString>
@@ -41,80 +40,132 @@ class AbstractInstrument;
 struct FunctionInfo;
 class ScriptModel;
 
+// -----------------------------------------------------------------------------
+// Persistent settings
+//
+// Keep each persistent setting in one place: type, public name, member,
+// QSettings key and default value. The list is deliberately kept in this
+// header so declarations and serialization cannot silently get out of sync.
+// -----------------------------------------------------------------------------
+#define DATA_SINGLETON_DEFAULT_BASE_SIZE QSize(400, 300)
+
+// -----------------------------------------------------------------------------
+// Persistent settings.
+//
+// type, public name, member, QSettings key, default value and assignment rule
+// are all kept in one place. The same list generates the members, accessors
+// and serialization code.
+// -----------------------------------------------------------------------------
+#define DATA_SINGLETON_SETTINGS(X) \
+    X(QSize,   BaseSize,            DATA_SINGLETON_DEFAULT_BASE_SIZE) \
+    X(bool,    IsAutoSave,          false) \
+    X(int,     AutoSaveInterval,    300) \
+    X(int,     HistoryDepth,        40) \
+    X(QString, AppLanguage,         QStringLiteral("system")) \
+    X(bool,    IsRestoreWindowSize, true) \
+    X(bool,    IsAskCanvasSize,     true) \
+    X(bool,    IsDarkMode,          false) \
+    X(bool,    IsLoadScript,        false) \
+    X(QString, ScriptPath,          QString()) \
+    X(QString, VirtualEnvPath,      QString())
+
+// -----------------------------------------------------------------------------
+// Shortcut definitions. The map member, logical key, QSettings key and
+// default shortcut are kept together, so read/write code is generated once.
+// -----------------------------------------------------------------------------
+#define DATA_SINGLETON_SHORTCUTS(X) \
+    X(mFileShortcuts,        "New",    "/Shortcuts/File/New",              QKeySequence(QKeySequence::New)) \
+    X(mFileShortcuts,        "Open",   "/Shortcuts/File/Open",             QKeySequence(QKeySequence::Open)) \
+    X(mFileShortcuts,        "Save",   "/Shortcuts/File/Save",             QKeySequence(QKeySequence::Save)) \
+    X(mFileShortcuts,        "SaveAs", "/Shortcuts/File/SaveAs",           QKeySequence(QKeySequence::SaveAs)) \
+    X(mFileShortcuts,        "Close",  "/Shortcuts/File/Close",            QKeySequence(QKeySequence::Close)) \
+    X(mFileShortcuts,        "Print",  "/Shortcuts/File/Print",            QKeySequence(QKeySequence::Print)) \
+    X(mFileShortcuts,        "Exit",   "/Shortcuts/File/Exit",             QKeySequence(QKeySequence::Quit)) \
+    X(mEditShortcuts,        "Undo",   "/Shortcuts/Edit/Undo",              QKeySequence(QKeySequence::Undo)) \
+    X(mEditShortcuts,        "Redo",   "/Shortcuts/Edit/Redo",              QKeySequence(QKeySequence::Redo)) \
+    X(mEditShortcuts,        "Copy",   "/Shortcuts/Edit/Copy",              QKeySequence(QKeySequence::Copy)) \
+    X(mEditShortcuts,        "Paste",  "/Shortcuts/Edit/Paste",             QKeySequence(QKeySequence::Paste)) \
+    X(mEditShortcuts,        "Cut",    "/Shortcuts/Edit/Cut",               QKeySequence(QKeySequence::Cut)) \
+    X(mInstrumentsShortcuts, "Cursor",  "/Shortcuts/Instruments/Cursor",   "Ctrl+1") \
+    X(mInstrumentsShortcuts, "Lastic",  "/Shortcuts/Instruments/Lastic",   "Ctrl+2") \
+    X(mInstrumentsShortcuts, "Pipette", "/Shortcuts/Instruments/Pipette",  "Ctrl+3") \
+    X(mInstrumentsShortcuts, "Loupe",   "/Shortcuts/Instruments/Loupe",    "Ctrl+4") \
+    X(mInstrumentsShortcuts, "Pen",     "/Shortcuts/Instruments/Pen",      "Ctrl+5") \
+    X(mInstrumentsShortcuts, "Line",    "/Shortcuts/Instruments/Line",     "Ctrl+6") \
+    X(mInstrumentsShortcuts, "Spray",   "/Shortcuts/Instruments/Spray",    "Ctrl+7") \
+    X(mInstrumentsShortcuts, "Fill",    "/Shortcuts/Instruments/Fill",     "Ctrl+8") \
+    X(mInstrumentsShortcuts, "Rect",    "/Shortcuts/Instruments/Rect",     "Ctrl+9") \
+    X(mInstrumentsShortcuts, "Ellipse", "/Shortcuts/Instruments/Ellipse",  "Ctrl+0") \
+    X(mInstrumentsShortcuts, "Curve",   "/Shortcuts/Instruments/Curve",    "") \
+    X(mInstrumentsShortcuts, "Text",    "/Shortcuts/Instruments/Text",     "") \
+    X(mToolsShortcuts,       "ZoomIn",  "/Shortcuts/Tools/Zoom/ZoomIn",     QKeySequence(QKeySequence::ZoomIn)) \
+    X(mToolsShortcuts,       "ZoomOut", "/Shortcuts/Tools/Zoom/ZoomOut",    QKeySequence(QKeySequence::ZoomOut))
+
 /**
  * @brief Singleton for variables needed for the program.
- *
  */
 class DataSingleton : public QObject
 {
 public:
-    /**
-     * @brief Instance of singleton (static)
-     *
-     * @return DataSingleton Pointer of singleton
-     */
     static DataSingleton* Instance();
 
-    QColor getPrimaryColor() { return mPrimaryColor; }
-    void setPrimaryColor(const QColor &color) { mPrimaryColor = color; }
-    QColor getSecondaryColor() { return mSecondaryColor; }
-    void setSecondaryColor(const QColor &color) { mSecondaryColor = color; }
-    int getPenSize() { return mPenSize; }
-    void setPenSize(int size) { mPenSize = size; }
-    InstrumentsEnum getInstrument() { return mCurrentInstrument; }
-    void setInstrument(const InstrumentsEnum &instrument) { mCurrentInstrument = instrument; mIsResetCurve = true; }
-    InstrumentsEnum getPreviousInstrument() { return mPreviousInstrument; }
-    void setPreviousInstrument(const InstrumentsEnum &instrument) { mPreviousInstrument = instrument; }
-    QSize getBaseSize() { return mBaseSize; }
-    void setBaseSize(const QSize &baseSize) { mBaseSize = baseSize; }
-    bool getIsAutoSave() { return mIsAutoSave; }
-    void setIsAutoSave(bool isAutoSave) { mIsAutoSave = isAutoSave; }
-    int getAutoSaveInterval() { return mAutoSaveInterval; }
-    void setAutoSaveInterval(int interval) { mAutoSaveInterval = interval; }
-    int getHistoryDepth() { return mHistoryDepth; }
-    void setHistoryDepth(const int &historyDepth) { mHistoryDepth = historyDepth; }
-    QString getAppLanguage() { return mAppLanguage; }
-    void setAppLanguage(const QString &appLanguage) { mAppLanguage = appLanguage; }
-    bool getIsRestoreWindowSize() { return mIsRestoreWindowSize; }
-    void setIsRestoreWindowSize(bool isRestoreWindowSize) { mIsRestoreWindowSize = isRestoreWindowSize; }
-    bool getIsAskCanvasSize() { return mIsAskCanvasSize; }
-    void setIsAskCanvasSize(bool isAskCanvasSize) { mIsAskCanvasSize = isAskCanvasSize; }
-    bool getIsDarkMode() { return mIsDarkMode; }
-    void setIsDarkMode(bool isDarkMode) { mIsDarkMode = isDarkMode; }
-    bool getIsLoadScript() { return mIsLoadScript; }
-    void setIsLoadScript(bool isLoadScript) { mIsLoadScript = isLoadScript; }
-    QString getScriptPath() { return mScriptPath; }
-    void setScriptPath(const QString& scriptPath) { mScriptPath = scriptPath; }
-    QString getVirtualEnvPath() { return mVirtualEnvironmentPath; }
-    void setVirtualEnvPath(const QString& virtualEnvironmentPath) { 
-        mVirtualEnvironmentPath = virtualEnvironmentPath; 
+    // Simple runtime properties.
+#define DATA_SINGLETON_RUNTIME_PROPERTY(type, name, member) \
+private: \
+    type member; \
+public: \
+    type get##name() const { return member; } \
+    void set##name(const type& value) { member = value; }
+
+    DATA_SINGLETON_RUNTIME_PROPERTY(QColor, PrimaryColor, mPrimaryColor)
+    DATA_SINGLETON_RUNTIME_PROPERTY(QColor, SecondaryColor, mSecondaryColor)
+    DATA_SINGLETON_RUNTIME_PROPERTY(int, PenSize, mPenSize)
+    DATA_SINGLETON_RUNTIME_PROPERTY(InstrumentsEnum, PreviousInstrument, mPreviousInstrument)
+    DATA_SINGLETON_RUNTIME_PROPERTY(QSize, WindowSize, mWindowSize)
+    DATA_SINGLETON_RUNTIME_PROPERTY(QString, LastFilePath, mLastFilePath)
+    DATA_SINGLETON_RUNTIME_PROPERTY(QFont, TextFont, mTextFont)
+
+#undef DATA_SINGLETON_RUNTIME_PROPERTY
+
+    // Persistent settings. Accessors are generated from the same list used
+    // by readSetting() and writeSettings().
+#define DATA_SINGLETON_SETTING_ACCESSOR(type, name, defaultValue) \
+    type get##name() const { return m##name; } \
+    void set##name(const type& value) { m##name = value; }
+
+    DATA_SINGLETON_SETTINGS(DATA_SINGLETON_SETTING_ACCESSOR)
+
+#undef DATA_SINGLETON_SETTING_ACCESSOR
+
+    InstrumentsEnum getInstrument() const { return mCurrentInstrument; }
+    void setInstrument(const InstrumentsEnum& instrument)
+    {
+        mCurrentInstrument = instrument;
+        mIsResetCurve = true;
     }
 
-    QString getLastFilePath() { return mLastFilePath; }
-    void setLastFilePath(const QString &lastFilePath) { mLastFilePath = lastFilePath; }
-    QSize getWindowSize() { return mWindowSize; }
-    void setWindowSize(const QSize &winSize) { mWindowSize = winSize; }
-    QFont getTextFont() { return mTextFont; }
-    void setTextFont(const QFont& textFont) { mTextFont = textFont; }
-    QMap<QString, QKeySequence> getFileShortcuts() { return mFileShortcuts; }
-    QKeySequence getFileShortcutByKey(const QString &key) { return mFileShortcuts[key]; }
-    void setFileShortcutByKey(const QString &key, const QKeySequence &value) { mFileShortcuts[key] = value; }
-    QMap<QString, QKeySequence> getEditShortcuts() { return mEditShortcuts; }
-    QKeySequence getEditShortcutByKey(const QString &key) { return mEditShortcuts[key]; }
-    void setEditShortcutByKey(const QString &key, const QKeySequence &value) { mEditShortcuts[key] = value; }
-    QMap<QString, QKeySequence> getInstrumentsShortcuts() { return mInstrumentsShortcuts; }
-    QKeySequence getInstrumentShortcutByKey(const QString &key) { return mInstrumentsShortcuts[key]; }
-    void setInstrumentShortcutByKey(const QString &key, const QKeySequence &value) { mInstrumentsShortcuts[key] = value; }
-    QMap<QString, QKeySequence> getToolsShortcuts() { return mToolsShortcuts; }
-    QKeySequence getToolShortcutByKey(const QString &key) { return mToolsShortcuts[key]; }
-    void setToolShortcutByKey(const QString &key, const QKeySequence &value) { mToolsShortcuts[key] = value; }
+    QMap<QString, QKeySequence> getFileShortcuts() const { return mFileShortcuts; }
+    QKeySequence getFileShortcutByKey(const QString& key) const { return mFileShortcuts.value(key); }
+    void setFileShortcutByKey(const QString& key, const QKeySequence& value) { mFileShortcuts[key] = value; }
 
-    //Needs for correct work of Bezier curve instrument
-    void setResetCurve(bool b) { mIsResetCurve = b; }
-    bool isResetCurve() { return mIsResetCurve; }
+    QMap<QString, QKeySequence> getEditShortcuts() const { return mEditShortcuts; }
+    QKeySequence getEditShortcutByKey(const QString& key) const { return mEditShortcuts.value(key); }
+    void setEditShortcutByKey(const QString& key, const QKeySequence& value) { mEditShortcuts[key] = value; }
 
-    void setMarkupMode(bool b) { mMarkupMode = b; }
-    bool isMarkupMode() { return mMarkupMode; }
+    QMap<QString, QKeySequence> getInstrumentsShortcuts() const { return mInstrumentsShortcuts; }
+    QKeySequence getInstrumentShortcutByKey(const QString& key) const { return mInstrumentsShortcuts.value(key); }
+    void setInstrumentShortcutByKey(const QString& key, const QKeySequence& value) { mInstrumentsShortcuts[key] = value; }
+
+    QMap<QString, QKeySequence> getToolsShortcuts() const { return mToolsShortcuts; }
+    QKeySequence getToolShortcutByKey(const QString& key) const { return mToolsShortcuts.value(key); }
+    void setToolShortcutByKey(const QString& key, const QKeySequence& value) { mToolsShortcuts[key] = value; }
+
+    // Needs for correct work of Bezier curve instrument.
+    void setResetCurve(bool value) { mIsResetCurve = value; }
+    bool isResetCurve() const { return mIsResetCurve; }
+
+    void setMarkupMode(bool value) { mMarkupMode = value; }
+    bool isMarkupMode() const { return mMarkupMode; }
 
     void setMarkupTransparency(int value) { mMarkupTransparency = qBound(0, value, 100); }
     int getMarkupTransparency() const { return mMarkupTransparency; }
@@ -132,26 +183,21 @@ private:
     DataSingleton(DataSingleton const&) = delete;
     DataSingleton& operator=(DataSingleton const&) = delete;
 
-    static DataSingleton* m_pInstance;
-    QColor mPrimaryColor,
-           mSecondaryColor;
-    int mPenSize;
-    InstrumentsEnum mCurrentInstrument, mPreviousInstrument;
-    QSize mBaseSize, mWindowSize;
-    bool mIsAutoSave, mIsRestoreWindowSize, mIsAskCanvasSize, mIsDarkMode;
-    bool mIsLoadScript;
-    QString mScriptPath;
-    QString mVirtualEnvironmentPath;
+#define DATA_SINGLETON_SETTING_MEMBER(type, name, defaultValue) \
+    type m##name{};
 
-    bool mIsResetCurve; /**< Needs to correct work of Bezier curve instrument */
+    DATA_SINGLETON_SETTINGS(DATA_SINGLETON_SETTING_MEMBER)
+
+#undef DATA_SINGLETON_SETTING_MEMBER
+
+    InstrumentsEnum mCurrentInstrument = NONE_INSTRUMENT;
+
+    bool mIsResetCurve = false; /**< Needs to correct work of Bezier curve instrument. */
     bool mMarkupMode = false;
     int mMarkupTransparency = 0;
-    int mAutoSaveInterval, mHistoryDepth;
-    QString mAppLanguage;
-    QString mLastFilePath; /* last opened file */
-    QFont mTextFont;
-    QMap<QString, QKeySequence> mFileShortcuts, mEditShortcuts, mInstrumentsShortcuts, mToolsShortcuts;
 
+    QMap<QString, QKeySequence> mFileShortcuts;
+    QMap<QString, QKeySequence> mEditShortcuts;
+    QMap<QString, QKeySequence> mInstrumentsShortcuts;
+    QMap<QString, QKeySequence> mToolsShortcuts;
 };
-
-#endif // DATASINGLETON_H
