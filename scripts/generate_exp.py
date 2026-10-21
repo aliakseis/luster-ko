@@ -24,6 +24,8 @@ model_id = "runwayml/stable-diffusion-v1-5"
 # Load base pipelines
 # ------------------------------------------------------------------------------
 
+#pipe = StableDiffusionPipeline.from_single_file(
+#    "/stable-diffusion-webui/models/Stable-diffusion/v1-5-pruned-emaonly.safetensors",
 pipe = StableDiffusionPipeline.from_pretrained(
     model_id,
     torch_dtype=torch.float16,
