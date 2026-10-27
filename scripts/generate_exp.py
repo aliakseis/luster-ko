@@ -56,6 +56,70 @@ inpaint_pipe = StableDiffusionInpaintPipeline(
 
 
 # ------------------------------------------------------------------------------
+# Optional mirror-ensemble UNet
+# ------------------------------------------------------------------------------
+
+_orig_unet_forward = None
+
+def _set_mirror_unet_ensemble(enable: bool):
+    global _orig_unet_forward
+
+    if enable:
+        if _orig_unet_forward is not None:
+            return
+
+        _orig_unet_forward = pipe.unet.forward
+
+        def mirrored_forward(sample, timestep, *args, **kwargs):
+
+            out1 = _orig_unet_forward(
+                sample,
+                timestep,
+                *args,
+                **kwargs
+            )
+
+            sample_flip = torch.flip(sample, dims=[3])
+
+            out2 = _orig_unet_forward(
+                sample_flip,
+                timestep,
+                *args,
+                **kwargs
+            )
+
+            if isinstance(out1, tuple):
+
+                pred1 = out1[0]
+                pred2 = out2[0]
+
+                pred = (
+                    pred1 +
+                    torch.flip(pred2, dims=[3])
+                ) * 0.5
+
+                return (pred,) + out1[1:]
+
+            else:
+
+                out1.sample = (
+                    out1.sample +
+                    torch.flip(out2.sample, dims=[3])
+                ) * 0.5
+
+                return out1
+
+        pipe.unet.forward = mirrored_forward
+
+    else:
+        if _orig_unet_forward is None:
+            return
+
+        pipe.unet.forward = _orig_unet_forward
+        _orig_unet_forward = None
+
+
+# ------------------------------------------------------------------------------
 # Scheduler setup
 # ------------------------------------------------------------------------------
 
@@ -947,6 +1011,7 @@ def generate_image(
     expand_left_or_top: bool = False,
     expand_right_or_bottom: bool = False,
     expand_vertical: bool = False,
+    mirror_unet_ensemble: bool = False,
 ):
     """
     Main image generation:
@@ -965,113 +1030,126 @@ def generate_image(
     logger.info(f'Using seed: {seed}')
     gen = torch.Generator(device=device).manual_seed(seed)
 
-    # ---------------------------------------------------------
-    # 1. Cache key ONLY for txt2img
-    # ---------------------------------------------------------
-    txt2img_key = (
-        prompt,
-        negative_prompt,
-        guidance_scale,
-        num_steps,
-        seed,
-    )
 
-    # ---------------------------------------------------------
-    # 2. Try using cached txt2img
-    # ---------------------------------------------------------
-    if _txt2img_cache["params"] == txt2img_key:
-        logger.info("Using cached txt2img result")
+    previous_mirror_state = (_orig_unet_forward is not None)
 
-        image = _txt2img_cache["image"].copy()
-        cond_embeds = _txt2img_cache["cond_embeds"]
-        cond_mask   = _txt2img_cache["cond_mask"]
-        neg_embeds  = _txt2img_cache["neg_embeds"]
-        neg_mask    = _txt2img_cache["neg_mask"]
+    if mirror_unet_ensemble != previous_mirror_state:
+        _set_mirror_unet_ensemble(mirror_unet_ensemble)
 
-    else:
+    try:
+
         # ---------------------------------------------------------
-        # 3. Build prompt embeddings
+        # 1. Cache key ONLY for txt2img
         # ---------------------------------------------------------
-        cond_embeds, cond_mask, neg_embeds, neg_mask = _build_prompt_embeds(
-            pipe,
+        txt2img_key = (
             prompt,
-            negative_prompt=negative_prompt,
-            base_emph=1.05,
-        )
-
-        # Move embeddings to correct dtype/device
-        cond_embeds = cond_embeds.to(dtype=pipe.text_encoder.dtype, device=pipe.device)
-        neg_embeds = neg_embeds.to(dtype=pipe.text_encoder.dtype, device=pipe.device)
-        cond_mask = cond_mask.to(pipe.device)
-        neg_mask = neg_mask.to(pipe.device)
-
-        # Pad embeddings so both conditional and negative have equal sequence length
-        cond_embeds, cond_mask, neg_embeds, neg_mask = _pad_embeds_and_masks(
-            cond_embeds, cond_mask, neg_embeds, neg_mask,
-            dtype=cond_embeds.dtype, device=cond_embeds.device,
+            negative_prompt,
+            guidance_scale,
+            num_steps,
+            seed,
+            mirror_unet_ensemble,
         )
 
         # ---------------------------------------------------------
-        # 4. Base txt2img generation
+        # 2. Try using cached txt2img
         # ---------------------------------------------------------
-        image = pipe(
-            prompt_embeds=cond_embeds,
-            attention_mask=cond_mask,
-            negative_prompt_embeds=neg_embeds,
-            negative_attention_mask=neg_mask,
-            guidance_scale=guidance_scale,
-            num_inference_steps=num_steps,
-            generator=gen,
-            callback_on_step_end=_callback,
-        ).images[0]
+        if _txt2img_cache["params"] == txt2img_key:
+            logger.info("Using cached txt2img result")
+
+            image = _txt2img_cache["image"].copy()
+            cond_embeds = _txt2img_cache["cond_embeds"]
+            cond_mask   = _txt2img_cache["cond_mask"]
+            neg_embeds  = _txt2img_cache["neg_embeds"]
+            neg_mask    = _txt2img_cache["neg_mask"]
+
+        else:
+            # ---------------------------------------------------------
+            # 3. Build prompt embeddings
+            # ---------------------------------------------------------
+            cond_embeds, cond_mask, neg_embeds, neg_mask = _build_prompt_embeds(
+                pipe,
+                prompt,
+                negative_prompt=negative_prompt,
+                base_emph=1.05,
+            )
+
+            # Move embeddings to correct dtype/device
+            cond_embeds = cond_embeds.to(dtype=pipe.text_encoder.dtype, device=pipe.device)
+            neg_embeds = neg_embeds.to(dtype=pipe.text_encoder.dtype, device=pipe.device)
+            cond_mask = cond_mask.to(pipe.device)
+            neg_mask = neg_mask.to(pipe.device)
+
+            # Pad embeddings so both conditional and negative have equal sequence length
+            cond_embeds, cond_mask, neg_embeds, neg_mask = _pad_embeds_and_masks(
+                cond_embeds, cond_mask, neg_embeds, neg_mask,
+                dtype=cond_embeds.dtype, device=cond_embeds.device,
+            )
+
+            # ---------------------------------------------------------
+            # 4. Base txt2img generation
+            # ---------------------------------------------------------
+            image = pipe(
+                prompt_embeds=cond_embeds,
+                attention_mask=cond_mask,
+                negative_prompt_embeds=neg_embeds,
+                negative_attention_mask=neg_mask,
+                guidance_scale=guidance_scale,
+                num_inference_steps=num_steps,
+                generator=gen,
+                callback_on_step_end=_callback,
+            ).images[0]
+
+            # ---------------------------------------------------------
+            # 5. Save txt2img + embeddings to cache
+            # ---------------------------------------------------------
+            _txt2img_cache["params"] = txt2img_key
+            _txt2img_cache["image"] = image.copy()
+            _txt2img_cache["cond_embeds"] = cond_embeds
+            _txt2img_cache["cond_mask"]   = cond_mask
+            _txt2img_cache["neg_embeds"]  = neg_embeds
+            _txt2img_cache["neg_mask"]    = neg_mask
+
+            gen = torch.Generator(device=device).manual_seed(seed)
 
         # ---------------------------------------------------------
-        # 5. Save txt2img + embeddings to cache
+        # 6. Optional outpainting
         # ---------------------------------------------------------
-        _txt2img_cache["params"] = txt2img_key
-        _txt2img_cache["image"] = image.copy()
-        _txt2img_cache["cond_embeds"] = cond_embeds
-        _txt2img_cache["cond_mask"]   = cond_mask
-        _txt2img_cache["neg_embeds"]  = neg_embeds
-        _txt2img_cache["neg_mask"]    = neg_mask
+        if expand_left_or_top or expand_right_or_bottom:
+            image = _expand_with_inpaint(
+                image=image,
+                cond_embeds=cond_embeds,
+                cond_mask=cond_mask,
+                neg_embeds=neg_embeds,
+                neg_mask=neg_mask,
+                gen=gen,
+                expand_left_or_top=expand_left_or_top,
+                expand_right_or_bottom=expand_right_or_bottom,
+                expand_vertical=expand_vertical,
+                steps=num_steps,
+                cfg=guidance_scale,
+            )
 
-        gen = torch.Generator(device=device).manual_seed(seed)
+        # ---------------------------------------------------------
+        # 7. Optional refiner
+        # ---------------------------------------------------------
+        if use_refiner:
+            image = _refine_image(
+                image=image,
+                cond_embeds=cond_embeds,
+                cond_mask=cond_mask,
+                neg_embeds=neg_embeds,
+                neg_mask=neg_mask,
+                gen=gen,
+                strength=refiner_strength,
+                steps=refiner_steps,
+                cfg=refiner_cfg,
+            )
 
-    # ---------------------------------------------------------
-    # 6. Optional outpainting
-    # ---------------------------------------------------------
-    if expand_left_or_top or expand_right_or_bottom:
-        image = _expand_with_inpaint(
-            image=image,
-            cond_embeds=cond_embeds,
-            cond_mask=cond_mask,
-            neg_embeds=neg_embeds,
-            neg_mask=neg_mask,
-            gen=gen,
-            expand_left_or_top=expand_left_or_top,
-            expand_right_or_bottom=expand_right_or_bottom,
-            expand_vertical=expand_vertical,
-            steps=num_steps,
-            cfg=guidance_scale,
-        )
+        # ---------------------------------------------------------
+        # 8. Return final numpy array
+        # ---------------------------------------------------------
+        return np.array(image)
 
-    # ---------------------------------------------------------
-    # 7. Optional refiner
-    # ---------------------------------------------------------
-    if use_refiner:
-        image = _refine_image(
-            image=image,
-            cond_embeds=cond_embeds,
-            cond_mask=cond_mask,
-            neg_embeds=neg_embeds,
-            neg_mask=neg_mask,
-            gen=gen,
-            strength=refiner_strength,
-            steps=refiner_steps,
-            cfg=refiner_cfg,
-        )
-
-    # ---------------------------------------------------------
-    # 8. Return final numpy array
-    # ---------------------------------------------------------
-    return np.array(image)
+    finally:
+        if mirror_unet_ensemble != previous_mirror_state:
+            _set_mirror_unet_ensemble(previous_mirror_state)
