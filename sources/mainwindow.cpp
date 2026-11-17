@@ -562,17 +562,12 @@ void MainWindow::activateTab(const int &index)
         return;
     mTabWidget->setCurrentIndex(index);
     getCurrentImageArea()->clearSelection();
-    QSize size = getCurrentImageArea()->getImage()->size();
-    mSizeLabel->setText(QString("%1 x %2").arg(size.width()).arg(size.height()));
+    setNewSizeToSizeLabel(getCurrentImageArea()->getImage()->size());
 
-    if(!getCurrentImageArea()->getFileName().isEmpty())
-    {
-        setWindowTitle(QString("%1 - luster-ko").arg(getCurrentImageArea()->getFileName()));
-    }
-    else
-    {
-        setWindowTitle(QString("%1 - luster-ko").arg(tr("Untitled Image")));
-    }
+    setWindowTitle(QStringLiteral("%1 - luster-ko").arg(
+        getCurrentImageArea()->getFileName().isEmpty()
+            ? tr("Untitled Image")
+            : getCurrentImageArea()->getFileName()));
     mUndoStackGroup->setActiveStack(getCurrentImageArea()->getUndoStack());
 
     if (auto area = getCurrentImageArea()) {
@@ -584,18 +579,54 @@ void MainWindow::activateTab(const int &index)
 
 void MainWindow::setNewSizeToSizeLabel(const QSize &size)
 {
-    mSizeLabel->setText(QString("%1 x %2").arg(size.width()).arg(size.height()));
+    mSizeLabel->setText(QStringLiteral("%1 x %2").arg(size.width()).arg(size.height()));
 }
 
 void MainWindow::setNewPosToPosLabel(const QPoint &pos)
 {
-    mPosLabel->setText(QString("%1,%2").arg(pos.x()).arg(pos.y()));
+    mPosLabel->setText(QStringLiteral("%1,%2").arg(pos.x()).arg(pos.y()));
 }
 
 void MainWindow::setCurrentPipetteColor(const QColor &color)
 {
-    mColorRGBLabel->setText(QString("RGB: %1,%2,%3").arg(color.red())
-                         .arg(color.green()).arg(color.blue()));
+    // 1) RGB -> [0, 1]
+    float r = color.red() / 255.0f;
+    float g = color.green() / 255.0f;
+    float b = color.blue() / 255.0f;
+
+    // 2) RGB -> HSL
+    float maxc = std::max({ r, g, b });
+    float minc = std::min({ r, g, b });
+    float L = (maxc + minc) * 0.5f;
+    float d = maxc - minc;
+
+    float H = 0.0f;
+    float S = 0.0f;
+
+    if (d > 1e-6f) {
+        S = d / (1.0f - std::fabs(2.0f * L - 1.0f));
+        if (maxc == r) {
+            H = std::fmod((g - b) / d, 6.0f);
+        }
+        else if (maxc == g) {
+            H = ((b - r) / d) + 2.0f;
+        }
+        else {
+            H = ((r - g) / d) + 4.0f;
+        }
+        H *= 60.0f;
+        if (H < 0.0f) {
+            H += 360.0f;
+        }
+    }
+
+    mColorRGBLabel->setText(QStringLiteral("RGB: %1, %2, %3 | HSL: %4, %5%, %6%")
+        .arg(color.red())
+        .arg(color.green())
+        .arg(color.blue())
+        .arg(qRound(H))
+        .arg(qRound(S * 100.0f))
+        .arg(qRound(L * 100.0f)));
 
     QPixmap statusColorPixmap = QPixmap(10, 10);
     QPainter statusColorPainter;
